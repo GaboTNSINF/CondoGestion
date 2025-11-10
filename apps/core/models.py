@@ -100,7 +100,7 @@ class Condominio(models.Model):
 # --- FIN: Modelo Condominio ---
 
 
-# --- INICIO: Modelos de Suscripción (SaaS) ¡NUEVOS! ---
+# --- INICIO: Modelos de Suscripción (SaaS) ---
 
 class CatPlan(models.Model):
     """
@@ -231,7 +231,13 @@ class Suscripcion(models.Model):
     actualizado_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Suscripción de {self.id_usuario.email} ({self.estado})"
+        # --- ¡MEJORA APLICADA! ---
+        # Usamos un 'try/except' para evitar que el admin se rompa
+        # si una suscripción se queda sin usuario por error.
+        try:
+            return f"Suscripción de {self.id_usuario.email} ({self.estado})"
+        except Exception:
+            return f"Suscripción ID: {self.id_suscripcion} ({self.estado})"
 
     class Meta:
         db_table = 'suscripcion'
