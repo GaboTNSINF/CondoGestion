@@ -3,7 +3,8 @@ from django.contrib import admin
 # Importamos los modelos que hemos creado en 'core'
 from .models import (
     CatTipoCuenta, Condominio, CatPlan, Suscripcion,
-    CatSegmento, CatUnidadTipo, CatViviendaSubtipo
+    CatSegmento, CatUnidadTipo, CatViviendaSubtipo,
+    Grupo, Unidad  # <-- ¡NUEVOS!
 )
 
 # --- INICIO: Admin para Catálogos de Unidad ---
@@ -66,6 +67,68 @@ class CondominioAdmin(admin.ModelAdmin):
 # --- FIN: Admin para Condominio ---
 
 
+# --- INICIO: Admin para Estructura Interna --- ¡NUEVO! ---
+
+@admin.register(Grupo)
+class GrupoAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para los Grupos (Torres, Etapas).
+    """
+    list_display = ('nombre', 'id_condominio', 'tipo')
+    search_fields = ('nombre', 'id_condominio__nombre')
+    list_filter = ('id_condominio__nombre', 'tipo')
+    
+    # Para mejorar la selección de Condominio
+    raw_id_fields = ('id_condominio',)
+    ordering = ('id_condominio__nombre', 'nombre')
+
+@admin.register(Unidad)
+class UnidadAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para las Unidades (Deptos, Bodegas).
+    """
+    list_display = (
+        'codigo', 
+        'id_grupo', 
+        'id_unidad_tipo', 
+        'id_segmento', 
+        'coef_prop', 
+        'metros2',
+        'habitable'
+    )
+    search_fields = ('codigo', 'id_grupo__nombre', 'id_grupo__id_condominio__nombre')
+    list_filter = (
+        'id_grupo__id_condominio__nombre', 
+        'id_grupo__nombre', 
+        'id_unidad_tipo', 
+        'id_segmento',
+        'habitable'
+    )
+    
+    # Para mejorar la selección de llaves foráneas
+    raw_id_fields = ('id_grupo', 'id_unidad_tipo', 'id_viv_subtipo', 'id_segmento')
+    
+    ordering = ('id_grupo', 'codigo')
+    
+    # Organiza los campos de edición
+    fieldsets = (
+        ('Información Principal', {
+            'fields': ('id_grupo', 'codigo', 'direccion', 'habitable')
+        }),
+        ('Clasificación (Catálogos)', {
+            'fields': ('id_unidad_tipo', 'id_viv_subtipo', 'id_segmento')
+        }),
+        ('Datos Económicos (Prorrateo)', {
+            'fields': ('coef_prop', 'metros2', 'rol_sii')
+        }),
+        ('Configuración Anexos', {
+            'fields': ('anexo_incluido', 'anexo_cobrable')
+        }),
+    )
+
+# --- FIN: Admin para Estructura Interna ---
+
+
 # --- INICIO: Admin para CatPlan ---
 
 @admin.register(CatPlan)
@@ -73,15 +136,13 @@ class CatPlanAdmin(admin.ModelAdmin):
     """
     Configuración del admin para el Catálogo de Planes SaaS.
     """
-    # --- ¡CAMBIO APLICADO! ---
-    # Añadimos 'max_grupos' a la lista
     list_display = (
         'nombre', 
         'codigo', 
         'precio_base_mensual', 
         'max_condominios', 
         'max_unidades', 
-        'max_grupos', # <-- AÑADIDO
+        'max_grupos',
         'es_personalizable'
     )
     search_fields = ('nombre', 'codigo')
@@ -98,14 +159,12 @@ class SuscripcionAdmin(admin.ModelAdmin):
     """
     Configuración del admin para las Suscripciones de los usuarios.
     """
-    # --- ¡CAMBIO APLICADO! ---
-    # Añadimos 'max_grupos' a la lista
     list_display = (
         'id_usuario', 
         'id_plan', 
         'estado', 
         'monto_mensual_final',
-        'max_grupos', # <-- AÑADIDO
+        'max_grupos',
         'fecha_termino'
     )
     search_fields = (

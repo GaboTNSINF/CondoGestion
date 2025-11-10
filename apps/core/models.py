@@ -36,7 +36,7 @@ class CatTipoCuenta(models.Model):
 # --- FIN: Catálogos para Condominio ---
 
 
-# --- INICIO: Modelos Estructura Condominio ---
+# --- INICIO: Catálogos de Estructura Condominio ---
 
 class CatSegmento(models.Model):
     """
@@ -89,7 +89,7 @@ class CatViviendaSubtipo(models.Model):
         verbose_name = 'Catálogo: Subtipo de Vivienda'
         verbose_name_plural = 'Catálogo: Subtipos de Vivienda'
 
-# --- FIN: Modelos Estructura Condominio ---
+# --- FIN: Catálogos de Estructura Condominio ---
 
 
 # --- INICIO: Modelo Condominio ---
@@ -147,6 +147,118 @@ class Condominio(models.Model):
 # --- FIN: Modelo Condominio ---
 
 
+# --- INICIO: Modelos de Estructura Interna --- ¡NUEVOS! ---
+
+class Grupo(models.Model):
+    """
+    [MAPEO: Tabla 'grupo']
+    Representa un agrupador lógico dentro de un condominio, como
+    una Torre, Etapa, Sector, Loteo, etc.
+    """
+    id_grupo = models.AutoField(primary_key=True)
+    
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.RESTRICT, # No permitir borrar un condo si tiene grupos
+        db_column='id_condominio'
+    )
+    
+    nombre = models.CharField(max_length=80)
+    tipo = models.CharField(
+        max_length=45,
+        db_comment="Tipo de grupo, ej: 'Torre', 'Etapa', 'Sector'"
+    )
+
+    def __str__(self):
+        try:
+            return f"{self.nombre} ({self.id_condominio.nombre})"
+        except Exception:
+            return f"Grupo ID: {self.id_grupo}"
+
+    class Meta:
+        db_table = 'grupo'
+        # Restricción del SQL: un grupo debe tener un nombre único
+        # DENTRO de su condominio.
+        unique_together = ('id_condominio', 'nombre')
+        verbose_name = 'Grupo (Torre/Etapa)'
+        verbose_name_plural = 'Grupos (Torres/Etapas)'
+
+class Unidad(models.Model):
+    """
+    [MAPEO: Tabla 'unidad']
+    Representa una unidad individual (Depto, Casa, Bodega, Estacionamiento).
+    """
+    id_unidad = models.AutoField(primary_key=True)
+    
+    id_grupo = models.ForeignKey(
+        Grupo,
+        on_delete=models.SET_NULL, # Como en el SQL, si se borra el grupo, la unidad queda "huérfana"
+        null=True, blank=True,
+        db_column='id_grupo',
+        verbose_name='Grupo (Torre/Etapa)'
+    )
+    
+    codigo = models.CharField(
+        max_length=40,
+        db_comment="Código/Nro de la unidad, ej: 'DEPTO-101', 'BOD-01', 'EST-12'"
+    )
+    direccion = models.CharField(max_length=200, null=True, blank=True)
+
+    # --- Llaves Foráneas a Catálogos ---
+    id_unidad_tipo = models.ForeignKey(
+        CatUnidadTipo,
+        on_delete=models.SET_NULL, # Si se borra el tipo, se pone NULL
+        null=True, blank=True,
+        db_column='id_unidad_tipo',
+        verbose_name='Tipo de Unidad'
+    )
+    id_viv_subtipo = models.ForeignKey(
+        CatViviendaSubtipo,
+        on_delete=models.SET_NULL, # El SQL usa RESTRICT, pero SET_NULL es más seguro
+        null=True, blank=True,
+        db_column='id_viv_subtipo',
+        verbose_name='Subtipo de Vivienda'
+    )
+    id_segmento = models.ForeignKey(
+        CatSegmento,
+        on_delete=models.SET_NULL, # Como en el SQL
+        null=True, blank=True,
+        db_column='id_segmento',
+        verbose_name='Segmento'
+    )
+
+    # --- Campos Específicos de la Unidad ---
+    anexo_incluido = models.BooleanField(default=False)
+    anexo_cobrable = models.BooleanField(default=False)
+    rol_sii = models.CharField(max_length=40, null=True, blank=True)
+    metros2 = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    # ¡Campo CRÍTICO para el prorrateo!
+    coef_prop = models.DecimalField(
+        max_digits=8, 
+        decimal_places=6,
+        db_comment="Coeficiente de propiedad (alícuota)"
+    )
+    
+    habitable = models.BooleanField(default=True)
+
+    def __str__(self):
+        try:
+            return f"Unidad {self.codigo} (Grupo: {self.id_grupo.nombre if self.id_grupo else 'N/A'})"
+        except Exception:
+            return f"Unidad ID: {self.id_unidad}"
+
+    class Meta:
+        db_table = 'unidad'
+        # Restricción del SQL: una unidad debe tener un código único
+        # DENTRO de su grupo.
+        unique_together = ('id_grupo', 'codigo')
+        verbose_name = 'Unidad (Depto/Casa)'
+        verbose_name_plural = 'Unidades (Deptos/Casas)'
+
+# --- FIN: Modelos de Estructura Interna ---
+
+
 # --- INICIO: Modelos de Suscripción (SaaS) ---
 
 class CatPlan(models.Model):
@@ -183,7 +295,6 @@ class CatPlan(models.Model):
         help_text="Número máximo de unidades (deptos/casas) totales"
     )
     
-    # --- ¡CAMBIO AÑADIDO POR FEEDBACK! ---
     max_grupos = models.PositiveSmallIntegerField(
         default=3, # Basado en el "Plan 1" de tu jefe
         help_text="Número máximo de grupos (torres, etapas) permitidos"
@@ -262,7 +373,6 @@ class Suscripcion(models.Model):
         help_text="Límite real de unidades para ESTA suscripción"
     )
     
-    # --- ¡CAMBIO AÑADIDO POR FEEDBACK! ---
     max_grupos = models.PositiveSmallIntegerField(
         default=3,
         help_text="Límite real de grupos (torres, etapas) para ESTA suscripción"
