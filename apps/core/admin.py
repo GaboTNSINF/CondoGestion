@@ -3,10 +3,10 @@ from django.contrib import admin
 # Importamos los modelos que hemos creado en 'core'
 from .models import (
     CatTipoCuenta, Condominio, CatPlan, Suscripcion,
-    CatSegmento, CatUnidadTipo, CatViviendaSubtipo  # <-- ¡NUEVOS!
+    CatSegmento, CatUnidadTipo, CatViviendaSubtipo
 )
 
-# --- INICIO: Admin para Catálogos de Unidad --- ¡NUEVO! ---
+# --- INICIO: Admin para Catálogos de Unidad ---
 
 @admin.register(CatSegmento)
 class CatSegmentoAdmin(admin.ModelAdmin):
@@ -73,12 +73,15 @@ class CatPlanAdmin(admin.ModelAdmin):
     """
     Configuración del admin para el Catálogo de Planes SaaS.
     """
+    # --- ¡CAMBIO APLICADO! ---
+    # Añadimos 'max_grupos' a la lista
     list_display = (
         'nombre', 
         'codigo', 
         'precio_base_mensual', 
         'max_condominios', 
         'max_unidades', 
+        'max_grupos', # <-- AÑADIDO
         'es_personalizable'
     )
     search_fields = ('nombre', 'codigo')
@@ -95,11 +98,14 @@ class SuscripcionAdmin(admin.ModelAdmin):
     """
     Configuración del admin para las Suscripciones de los usuarios.
     """
+    # --- ¡CAMBIO APLICADO! ---
+    # Añadimos 'max_grupos' a la lista
     list_display = (
         'id_usuario', 
         'id_plan', 
         'estado', 
-        'monto_mensual_final', 
+        'monto_mensual_final',
+        'max_grupos', # <-- AÑADIDO
         'fecha_termino'
     )
     search_fields = (

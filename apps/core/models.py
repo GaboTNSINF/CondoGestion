@@ -36,7 +36,7 @@ class CatTipoCuenta(models.Model):
 # --- FIN: Catálogos para Condominio ---
 
 
-# --- INICIO: Modelos Estructura Condominio --- ¡NUEVOS CATÁLOGOS! ---
+# --- INICIO: Modelos Estructura Condominio ---
 
 class CatSegmento(models.Model):
     """
@@ -182,6 +182,12 @@ class CatPlan(models.Model):
         default=100,
         help_text="Número máximo de unidades (deptos/casas) totales"
     )
+    
+    # --- ¡CAMBIO AÑADIDO POR FEEDBACK! ---
+    max_grupos = models.PositiveSmallIntegerField(
+        default=3, # Basado en el "Plan 1" de tu jefe
+        help_text="Número máximo de grupos (torres, etapas) permitidos"
+    )
 
     features_json = models.JSONField(
         default=dict,
@@ -254,6 +260,12 @@ class Suscripcion(models.Model):
     max_unidades = models.PositiveSmallIntegerField(
         default=100,
         help_text="Límite real de unidades para ESTA suscripción"
+    )
+    
+    # --- ¡CAMBIO AÑADIDO POR FEEDBACK! ---
+    max_grupos = models.PositiveSmallIntegerField(
+        default=3,
+        help_text="Límite real de grupos (torres, etapas) para ESTA suscripción"
     )
 
     features_json = models.JSONField(
