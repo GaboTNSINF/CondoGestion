@@ -1,7 +1,30 @@
 # Importamos el módulo 'admin' de Django
 from django.contrib import admin
 # Importamos los modelos que hemos creado en 'core'
-from .models import CatTipoCuenta, Condominio, CatPlan, Suscripcion
+from .models import (
+    CatTipoCuenta, Condominio, CatPlan, Suscripcion,
+    CatSegmento, CatUnidadTipo, CatViviendaSubtipo  # <-- ¡NUEVOS!
+)
+
+# --- INICIO: Admin para Catálogos de Unidad --- ¡NUEVO! ---
+
+@admin.register(CatSegmento)
+class CatSegmentoAdmin(admin.ModelAdmin):
+    list_display = ('id_segmento', 'codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+@admin.register(CatUnidadTipo)
+class CatUnidadTipoAdmin(admin.ModelAdmin):
+    list_display = ('id_unidad_tipo', 'codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+@admin.register(CatViviendaSubtipo)
+class CatViviendaSubtipoAdmin(admin.ModelAdmin):
+    list_display = ('id_viv_subtipo', 'codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+# --- FIN: Admin para Catálogos de Unidad ---
+
 
 # --- INICIO: Admin para CatTipoCuenta ---
 
@@ -10,11 +33,8 @@ class CatTipoCuentaAdmin(admin.ModelAdmin):
     """
     Configuración del admin para el catálogo de Tipos de Cuenta.
     """
-    # Campos a mostrar en la lista
     list_display = ('id_tipo_cuenta', 'codigo', 'nombre')
-    # Campos por los que se puede buscar
     search_fields = ('codigo', 'nombre')
-    # Orden por defecto
     ordering = ('id_tipo_cuenta',)
 
 # --- FIN: Admin para CatTipoCuenta ---
@@ -27,16 +47,9 @@ class CondominioAdmin(admin.ModelAdmin):
     """
     Configuración del admin para el modelo Condominio.
     """
-    # Campos a mostrar en la lista de condominios
     list_display = ('id_condominio', 'nombre', 'rut_base', 'email_contacto', 'telefono')
-    
-    # Campos por los que se puede buscar
     search_fields = ('nombre', 'rut_base', 'email_contacto')
-    
-    # Filtros que aparecerán en la barra lateral
     list_filter = ('region', 'comuna')
-    
-    # Organiza los campos de edición en secciones (fieldsets)
     fieldsets = (
         ('Información Principal', {
             'fields': ('nombre', ('rut_base', 'rut_dv'))
@@ -48,14 +61,12 @@ class CondominioAdmin(admin.ModelAdmin):
             'fields': ('banco', 'id_tipo_cuenta', 'num_cuenta')
         }),
     )
-    
-    # Orden por defecto
     ordering = ('nombre',)
 
 # --- FIN: Admin para Condominio ---
 
 
-# --- INICIO: Admin para CatPlan --- ¡NUEVO! ---
+# --- INICIO: Admin para CatPlan ---
 
 @admin.register(CatPlan)
 class CatPlanAdmin(admin.ModelAdmin):
@@ -77,7 +88,7 @@ class CatPlanAdmin(admin.ModelAdmin):
 # --- FIN: Admin para CatPlan ---
 
 
-# --- INICIO: Admin para Suscripcion --- ¡NUEVO! ---
+# --- INICIO: Admin para Suscripcion ---
 
 @admin.register(Suscripcion)
 class SuscripcionAdmin(admin.ModelAdmin):
@@ -97,11 +108,7 @@ class SuscripcionAdmin(admin.ModelAdmin):
         'id_plan__nombre'
     )
     list_filter = ('estado', 'id_plan')
-    
-    # Usamos 'raw_id_fields' para el 'id_usuario' porque pueden
-    # haber miles de usuarios, y un dropdown sería muy lento.
     raw_id_fields = ('id_usuario',)
-    
     ordering = ('id_usuario__email',)
 
 # --- FIN: Admin para Suscripcion ---

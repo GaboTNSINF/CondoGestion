@@ -36,6 +36,62 @@ class CatTipoCuenta(models.Model):
 # --- FIN: Catálogos para Condominio ---
 
 
+# --- INICIO: Modelos Estructura Condominio --- ¡NUEVOS CATÁLOGOS! ---
+
+class CatSegmento(models.Model):
+    """
+    [MAPEO: Tabla 'cat_segmento']
+    Catálogo para segmentar unidades (ej: 'Residencial', 'Comercial').
+    """
+    id_segmento = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=20, unique=True)
+    nombre = models.CharField(max_length=60)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        db_table = 'cat_segmento'
+        verbose_name = 'Catálogo: Segmento de Unidad'
+        verbose_name_plural = 'Catálogo: Segmentos de Unidad'
+
+class CatUnidadTipo(models.Model):
+    """
+    [MAPEO: Tabla 'cat_unidad_tipo']
+    Catálogo para tipos de unidad (ej: 'Depto', 'Casa', 'Bodega', 'Estac').
+    """
+    id_unidad_tipo = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=20, unique=True)
+    nombre = models.CharField(max_length=60)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        db_table = 'cat_unidad_tipo'
+        verbose_name = 'Catálogo: Tipo de Unidad'
+        verbose_name_plural = 'Catálogo: Tipos de Unidad'
+
+class CatViviendaSubtipo(models.Model):
+    """
+    [MAPEO: Tabla 'cat_vivienda_subtipo']
+    Catálogo para subtipos de vivienda (ej: '1D1B', '2D2B', 'Duplex').
+    """
+    id_viv_subtipo = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=30, unique=True)
+    nombre = models.CharField(max_length=60)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        db_table = 'cat_vivienda_subtipo'
+        verbose_name = 'Catálogo: Subtipo de Vivienda'
+        verbose_name_plural = 'Catálogo: Subtipos de Vivienda'
+
+# --- FIN: Modelos Estructura Condominio ---
+
+
 # --- INICIO: Modelo Condominio ---
 
 class Condominio(models.Model):
@@ -43,7 +99,6 @@ class Condominio(models.Model):
     [MAPEO: Tabla 'condominio']
     Representa un condominio o edificio administrado en la plataforma.
     """
-    # id_condominio: Django lo crea automáticamente (id)
     id_condominio = models.AutoField(primary_key=True)
     
     nombre = models.CharField(
@@ -52,9 +107,8 @@ class Condominio(models.Model):
         db_comment="Nombre oficial y único del condominio"
     )
     
-    # RUT (basado en el SQL)
     rut_base = models.IntegerField(
-        null=True, blank=True, # Permitimos nulos como en el SQL
+        null=True, blank=True,
         db_comment="RUT del condominio (sin DV)"
     )
     rut_dv = models.CharField(
@@ -63,39 +117,32 @@ class Condominio(models.Model):
         db_comment="Dígito verificador del RUT"
     )
     
-    # Campos de Ubicación (basado en el SQL)
     direccion = models.CharField(max_length=200, null=True, blank=True)
     comuna = models.CharField(max_length=80, null=True, blank=True)
     region = models.CharField(max_length=80, null=True, blank=True)
     
-    # Campos de Contacto (basado en el SQL)
     email_contacto = models.EmailField(max_length=120, null=True, blank=True)
     telefono = models.CharField(max_length=40, null=True, blank=True)
 
-    # --- Campos Bancarios (basado en el SQL) ---
     banco = models.CharField(max_length=80, null=True, blank=True)
     
-    # Llave Foránea (FK) a CatTipoCuenta
-    # Esto crea la relación con la tabla 'cat_tipo_cuenta'
     id_tipo_cuenta = models.ForeignKey(
         CatTipoCuenta,
-        on_delete=models.SET_NULL, # Si se borra un tipo de cuenta, pone NULL aquí
+        on_delete=models.SET_NULL,
         null=True, blank=True,
-        db_column='id_tipo_cuenta', # Nombre exacto de la columna en el SQL
+        db_column='id_tipo_cuenta',
         verbose_name='Tipo de Cuenta'
     )
     
     num_cuenta = models.CharField(max_length=40, null=True, blank=True)
 
     def __str__(self):
-        """Representación en texto del modelo"""
         return self.nombre
 
     class Meta:
         db_table = 'condominio'
         verbose_name = 'Condominio'
         verbose_name_plural = 'Condominios'
-        # El 'uk_condominio_nombre' ya está cubierto por 'unique=True' en el campo 'nombre'
 
 # --- FIN: Modelo Condominio ---
 
@@ -119,8 +166,6 @@ class CatPlan(models.Model):
         help_text="Nombre comercial del plan (ej: 'Plan Profesional')"
     )
     
-    # --- PRECIOS Y LÍMITES BASE DEL PLAN ---
-    # Este es el precio que cobramos por este paquete CERRADO
     precio_base_mensual = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
@@ -138,13 +183,11 @@ class CatPlan(models.Model):
         help_text="Número máximo de unidades (deptos/casas) totales"
     )
 
-    # Banderas de funcionalidad (ej: {'has_concierge': true, 'allow_voting': false})
     features_json = models.JSONField(
         default=dict,
         help_text="Banderas JSON que definen qué módulos incluye este plan"
     )
     
-    # Es la bandera para identificar el "Planificador"
     es_personalizable = models.BooleanField(
         default=False,
         help_text="Si es True, este plan es el 'Planificador' (cotizable)"
@@ -163,32 +206,28 @@ class Suscripcion(models.Model):
     """
     [NUEVA TABLA - SaaS]
     La suscripción ACTIVA de un Usuario (admin).
-    Aquí se guardan los límites y el precio final que el cliente paga.
     """
     id_suscripcion = models.AutoField(primary_key=True)
 
-    # Conectamos la suscripción con el Usuario (admin) que paga
     id_usuario = models.OneToOneField(
-        settings.AUTH_USER_MODEL, # Referencia al modelo 'Usuario'
-        on_delete=models.PROTECT, # No borrar un usuario si tiene una suscripción
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
         db_column='id_usuario',
         help_text="El usuario (administrador) dueño de esta suscripción"
     )
     
-    # Conectamos al plan "plantilla" que eligió (ej: "Pro" o "Planificador")
     id_plan = models.ForeignKey(
         CatPlan,
-        on_delete=models.PROTECT, # No borrar planes si están en uso
+        on_delete=models.PROTECT,
         db_column='id_plan',
         help_text="El plan base o plantilla seleccionado"
     )
     
-    # --- ESTADO Y FECHAS ---
     class EstadoSuscripcion(models.TextChoices):
         ACTIVA = 'activa', 'Activa'
         PRUEBA = 'prueba', 'En Prueba'
-        CANCELADA = 'cancelada', 'Cancelada' # Cliente se dio de baja
-        VENCIDA = 'vencida', 'Vencida' # Dejó de pagar
+        CANCELADA = 'cancelada', 'Cancelada'
+        VENCIDA = 'vencida', 'Vencida'
 
     estado = models.CharField(
         max_length=20,
@@ -200,10 +239,6 @@ class Suscripcion(models.Model):
         null=True, blank=True,
         help_text="Fecha de fin (para planes de prueba o si se cancela)"
     )
-
-    # --- LÍMITES Y PRECIO FINAL (¡LA CLAVE!) ---
-    # Estos campos son los que realmente mandan.
-    # Se copian del CatPlan o se definen "a mano" con el Planificador.
     
     monto_mensual_final = models.DecimalField(
         max_digits=10, 
@@ -221,7 +256,6 @@ class Suscripcion(models.Model):
         help_text="Límite real de unidades para ESTA suscripción"
     )
 
-    # Las features finales de ESTA suscripción
     features_json = models.JSONField(
         default=dict,
         help_text="Banderas JSON que definen los módulos de ESTA suscripción"
@@ -231,9 +265,6 @@ class Suscripcion(models.Model):
     actualizado_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        # --- ¡MEJORA APLICADA! ---
-        # Usamos un 'try/except' para evitar que el admin se rompa
-        # si una suscripción se queda sin usuario por error.
         try:
             return f"Suscripción de {self.id_usuario.email} ({self.estado})"
         except Exception:
