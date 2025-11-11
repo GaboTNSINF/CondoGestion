@@ -4,7 +4,8 @@ from django.contrib import admin
 from .models import (
     CatTipoCuenta, Condominio, CatPlan, Suscripcion,
     CatSegmento, CatUnidadTipo, CatViviendaSubtipo,
-    Grupo, Unidad  # <-- ¡NUEVOS!
+    Grupo, Unidad,
+    CatDocTipo, Proveedor  # <-- ¡NUEVOS!
 )
 
 # --- INICIO: Admin para Catálogos de Unidad ---
@@ -27,7 +28,7 @@ class CatViviendaSubtipoAdmin(admin.ModelAdmin):
 # --- FIN: Admin para Catálogos de Unidad ---
 
 
-# --- INICIO: Admin para CatTipoCuenta ---
+# --- INICIO: Admin para Catálogos Varios ---
 
 @admin.register(CatTipoCuenta)
 class CatTipoCuentaAdmin(admin.ModelAdmin):
@@ -38,7 +39,16 @@ class CatTipoCuentaAdmin(admin.ModelAdmin):
     search_fields = ('codigo', 'nombre')
     ordering = ('id_tipo_cuenta',)
 
-# --- FIN: Admin para CatTipoCuenta ---
+@admin.register(CatDocTipo) # <-- ¡NUEVO!
+class CatDocTipoAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para el catálogo de Tipos de Documento.
+    """
+    list_display = ('id_doc_tipo', 'codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+    ordering = ('id_doc_tipo',)
+
+# --- FIN: Admin para Catálogos Varios ---
 
 
 # --- INICIO: Admin para Condominio ---
@@ -67,7 +77,7 @@ class CondominioAdmin(admin.ModelAdmin):
 # --- FIN: Admin para Condominio ---
 
 
-# --- INICIO: Admin para Estructura Interna --- ¡NUEVO! ---
+# --- INICIO: Admin para Estructura Interna ---
 
 @admin.register(Grupo)
 class GrupoAdmin(admin.ModelAdmin):
@@ -77,8 +87,6 @@ class GrupoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'id_condominio', 'tipo')
     search_fields = ('nombre', 'id_condominio__nombre')
     list_filter = ('id_condominio__nombre', 'tipo')
-    
-    # Para mejorar la selección de Condominio
     raw_id_fields = ('id_condominio',)
     ordering = ('id_condominio__nombre', 'nombre')
 
@@ -104,13 +112,8 @@ class UnidadAdmin(admin.ModelAdmin):
         'id_segmento',
         'habitable'
     )
-    
-    # Para mejorar la selección de llaves foráneas
     raw_id_fields = ('id_grupo', 'id_unidad_tipo', 'id_viv_subtipo', 'id_segmento')
-    
     ordering = ('id_grupo', 'codigo')
-    
-    # Organiza los campos de edición
     fieldsets = (
         ('Información Principal', {
             'fields': ('id_grupo', 'codigo', 'direccion', 'habitable')
@@ -127,6 +130,21 @@ class UnidadAdmin(admin.ModelAdmin):
     )
 
 # --- FIN: Admin para Estructura Interna ---
+
+
+# --- INICIO: Admin para Proveedor --- ¡NUEVO! ---
+
+@admin.register(Proveedor)
+class ProveedorAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para el modelo Proveedor.
+    """
+    list_display = ('nombre', 'rut_base', 'rut_dv', 'tipo', 'email', 'telefono')
+    search_fields = ('nombre', 'rut_base', 'email')
+    list_filter = ('tipo',)
+    ordering = ('nombre',)
+
+# --- FIN: Admin para Proveedor ---
 
 
 # --- INICIO: Admin para CatPlan ---

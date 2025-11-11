@@ -92,6 +92,28 @@ class CatViviendaSubtipo(models.Model):
 # --- FIN: Catálogos de Estructura Condominio ---
 
 
+# --- INICIO: Catálogos de Gastos y Pagos --- ¡NUEVO! ---
+
+class CatDocTipo(models.Model):
+    """
+    [MAPEO: Tabla 'cat_doc_tipo']
+    Catálogo para tipos de documentos (ej: 'Factura', 'Boleta', 'Recibo').
+    """
+    id_doc_tipo = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=20, unique=True)
+    # Añadimos un 'nombre' para que sea más descriptivo
+    nombre = models.CharField(max_length=60, default='')
+
+    def __str__(self):
+        return self.nombre or self.codigo
+    class Meta:
+        db_table = 'cat_doc_tipo'
+        verbose_name = 'Catálogo: Tipo de Documento'
+        verbose_name_plural = 'Catálogo: Tipos de Documento'
+
+# --- FIN: Catálogos de Gastos y Pagos ---
+
+
 # --- INICIO: Modelo Condominio ---
 
 class Condominio(models.Model):
@@ -147,22 +169,19 @@ class Condominio(models.Model):
 # --- FIN: Modelo Condominio ---
 
 
-# --- INICIO: Modelos de Estructura Interna --- ¡NUEVOS! ---
+# --- INICIO: Modelos de Estructura Interna ---
 
 class Grupo(models.Model):
     """
     [MAPEO: Tabla 'grupo']
-    Representa un agrupador lógico dentro de un condominio, como
-    una Torre, Etapa, Sector, Loteo, etc.
+    Representa un agrupador lógico dentro de un condominio (Torre, Etapa).
     """
     id_grupo = models.AutoField(primary_key=True)
-    
     id_condominio = models.ForeignKey(
         Condominio,
-        on_delete=models.RESTRICT, # No permitir borrar un condo si tiene grupos
+        on_delete=models.RESTRICT,
         db_column='id_condominio'
     )
-    
     nombre = models.CharField(max_length=80)
     tipo = models.CharField(
         max_length=45,
@@ -174,11 +193,8 @@ class Grupo(models.Model):
             return f"{self.nombre} ({self.id_condominio.nombre})"
         except Exception:
             return f"Grupo ID: {self.id_grupo}"
-
     class Meta:
         db_table = 'grupo'
-        # Restricción del SQL: un grupo debe tener un nombre único
-        # DENTRO de su condominio.
         unique_together = ('id_condominio', 'nombre')
         verbose_name = 'Grupo (Torre/Etapa)'
         verbose_name_plural = 'Grupos (Torres/Etapas)'
@@ -186,60 +202,51 @@ class Grupo(models.Model):
 class Unidad(models.Model):
     """
     [MAPEO: Tabla 'unidad']
-    Representa una unidad individual (Depto, Casa, Bodega, Estacionamiento).
+    Representa una unidad individual (Depto, Casa, Bodega).
     """
     id_unidad = models.AutoField(primary_key=True)
-    
     id_grupo = models.ForeignKey(
         Grupo,
-        on_delete=models.SET_NULL, # Como en el SQL, si se borra el grupo, la unidad queda "huérfana"
+        on_delete=models.SET_NULL,
         null=True, blank=True,
         db_column='id_grupo',
         verbose_name='Grupo (Torre/Etapa)'
     )
-    
     codigo = models.CharField(
         max_length=40,
         db_comment="Código/Nro de la unidad, ej: 'DEPTO-101', 'BOD-01', 'EST-12'"
     )
     direccion = models.CharField(max_length=200, null=True, blank=True)
-
-    # --- Llaves Foráneas a Catálogos ---
     id_unidad_tipo = models.ForeignKey(
         CatUnidadTipo,
-        on_delete=models.SET_NULL, # Si se borra el tipo, se pone NULL
+        on_delete=models.SET_NULL,
         null=True, blank=True,
         db_column='id_unidad_tipo',
         verbose_name='Tipo de Unidad'
     )
     id_viv_subtipo = models.ForeignKey(
         CatViviendaSubtipo,
-        on_delete=models.SET_NULL, # El SQL usa RESTRICT, pero SET_NULL es más seguro
+        on_delete=models.SET_NULL,
         null=True, blank=True,
         db_column='id_viv_subtipo',
         verbose_name='Subtipo de Vivienda'
     )
     id_segmento = models.ForeignKey(
         CatSegmento,
-        on_delete=models.SET_NULL, # Como en el SQL
+        on_delete=models.SET_NULL,
         null=True, blank=True,
         db_column='id_segmento',
         verbose_name='Segmento'
     )
-
-    # --- Campos Específicos de la Unidad ---
     anexo_incluido = models.BooleanField(default=False)
     anexo_cobrable = models.BooleanField(default=False)
     rol_sii = models.CharField(max_length=40, null=True, blank=True)
     metros2 = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
-    # ¡Campo CRÍTICO para el prorrateo!
     coef_prop = models.DecimalField(
         max_digits=8, 
         decimal_places=6,
         db_comment="Coeficiente de propiedad (alícuota)"
     )
-    
     habitable = models.BooleanField(default=True)
 
     def __str__(self):
@@ -247,11 +254,8 @@ class Unidad(models.Model):
             return f"Unidad {self.codigo} (Grupo: {self.id_grupo.nombre if self.id_grupo else 'N/A'})"
         except Exception:
             return f"Unidad ID: {self.id_unidad}"
-
     class Meta:
         db_table = 'unidad'
-        # Restricción del SQL: una unidad debe tener un código único
-        # DENTRO de su grupo.
         unique_together = ('id_grupo', 'codigo')
         verbose_name = 'Unidad (Depto/Casa)'
         verbose_name_plural = 'Unidades (Deptos/Casas)'
@@ -259,15 +263,52 @@ class Unidad(models.Model):
 # --- FIN: Modelos de Estructura Interna ---
 
 
+# --- INICIO: Modelos de Negocio (Gastos y Pagos) --- ¡NUEVO! ---
+
+class Proveedor(models.Model):
+    """
+    [MAPEO: Tabla 'proveedor']
+    Representa una entidad (persona o empresa) que emite documentos (gastos).
+    """
+    id_proveedor = models.AutoField(primary_key=True)
+
+    class TipoProveedor(models.TextChoices):
+        PERSONA = 'persona', 'Persona'
+        EMPRESA = 'empresa', 'Empresa'
+
+    tipo = models.CharField(
+        max_length=10,
+        choices=TipoProveedor.choices,
+        default=TipoProveedor.EMPRESA
+    )
+    rut_base = models.IntegerField()
+    rut_dv = models.CharField(max_length=1)
+    nombre = models.CharField(max_length=140)
+    giro = models.CharField(max_length=140, null=True, blank=True)
+    email = models.EmailField(max_length=120, null=True, blank=True)
+    telefono = models.CharField(max_length=40, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.nombre} ({self.rut_base}-{self.rut_dv})"
+
+    class Meta:
+        db_table = 'proveedor'
+        # Restricción del SQL
+        unique_together = ('rut_base', 'rut_dv')
+        verbose_name = 'Proveedor'
+        verbose_name_plural = 'Proveedores'
+
+# --- FIN: Modelos de Negocio (Gastos y Pagos) ---
+
+
 # --- INICIO: Modelos de Suscripción (SaaS) ---
 
 class CatPlan(models.Model):
     """
     [NUEVA TABLA - SaaS]
-    Catálogo de los planes de suscripción pre-definidos (Esencial, Pro, etc.)
+    Catálogo de los planes de suscripción pre-definidos.
     """
     id_plan = models.AutoField(primary_key=True)
-    
     codigo = models.CharField(
         max_length=30, 
         unique=True, 
@@ -277,34 +318,28 @@ class CatPlan(models.Model):
         max_length=100,
         help_text="Nombre comercial del plan (ej: 'Plan Profesional')"
     )
-    
     precio_base_mensual = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
         default=0,
         help_text="Precio mensual del paquete (si es 0, es 'Planificador')"
     )
-    
     max_condominios = models.PositiveSmallIntegerField(
         default=1,
         help_text="Número máximo de condominios permitidos en este plan"
     )
-    
     max_unidades = models.PositiveSmallIntegerField(
         default=100,
         help_text="Número máximo de unidades (deptos/casas) totales"
     )
-    
     max_grupos = models.PositiveSmallIntegerField(
-        default=3, # Basado en el "Plan 1" de tu jefe
+        default=3,
         help_text="Número máximo de grupos (torres, etapas) permitidos"
     )
-
     features_json = models.JSONField(
         default=dict,
         help_text="Banderas JSON que definen qué módulos incluye este plan"
     )
-    
     es_personalizable = models.BooleanField(
         default=False,
         help_text="Si es True, este plan es el 'Planificador' (cotizable)"
@@ -312,7 +347,6 @@ class CatPlan(models.Model):
 
     def __str__(self):
         return self.nombre
-
     class Meta:
         db_table = 'cat_plan'
         verbose_name = 'Catálogo: Plan de Suscripción'
@@ -325,14 +359,12 @@ class Suscripcion(models.Model):
     La suscripción ACTIVA de un Usuario (admin).
     """
     id_suscripcion = models.AutoField(primary_key=True)
-
     id_usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         db_column='id_usuario',
         help_text="El usuario (administrador) dueño de esta suscripción"
     )
-    
     id_plan = models.ForeignKey(
         CatPlan,
         on_delete=models.PROTECT,
@@ -356,33 +388,27 @@ class Suscripcion(models.Model):
         null=True, blank=True,
         help_text="Fecha de fin (para planes de prueba o si se cancela)"
     )
-    
     monto_mensual_final = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
         help_text="El monto final calculado que el cliente paga por mes"
     )
-    
     max_condominios = models.PositiveSmallIntegerField(
         default=1,
         help_text="Límite real de condominios para ESTA suscripción"
     )
-    
     max_unidades = models.PositiveSmallIntegerField(
         default=100,
         help_text="Límite real de unidades para ESTA suscripción"
     )
-    
     max_grupos = models.PositiveSmallIntegerField(
         default=3,
         help_text="Límite real de grupos (torres, etapas) para ESTA suscripción"
     )
-
     features_json = models.JSONField(
         default=dict,
         help_text="Banderas JSON que definen los módulos de ESTA suscripción"
     )
-    
     creado_at = models.DateTimeField(auto_now_add=True)
     actualizado_at = models.DateTimeField(auto_now=True)
 
