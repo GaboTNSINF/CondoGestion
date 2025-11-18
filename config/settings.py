@@ -132,3 +132,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Le decimos a Django que nuestro modelo de usuario personalizado
 # se encuentra en la app 'usuarios' y se llama 'Usuario'.
 AUTH_USER_MODEL = 'usuarios.Usuario'
+
+
+# --- NUEVAS LÍNEAS ---
+
+# A dónde redirigir al usuario DESPUÉS de un login exitoso.
+LOGIN_REDIRECT_URL = '/'
+
+# A dónde redirigir al usuario si intenta acceder a una página
+# protegida sin haber iniciado sesión.
+LOGIN_URL = '/auth/login/'
