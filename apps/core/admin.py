@@ -5,7 +5,8 @@ from .models import (
     CatTipoCuenta, Condominio, CatPlan, Suscripcion,
     CatSegmento, CatUnidadTipo, CatViviendaSubtipo,
     Grupo, Unidad,
-    CatDocTipo, Proveedor  # <-- ¡NUEVOS!
+    CatDocTipo, Proveedor,
+    GastoCategoria, Gasto  # <-- ¡NUEVOS IMPORTES!
 )
 
 # --- INICIO: Admin para Catálogos de Unidad ---
@@ -195,3 +196,46 @@ class SuscripcionAdmin(admin.ModelAdmin):
     ordering = ('id_usuario__email',)
 
 # --- FIN: Admin para Suscripcion ---
+
+
+# --- INICIO: Admin de Gastos (Sprint 2) --- ¡NUEVO! ---
+
+@admin.register(GastoCategoria)
+class GastoCategoriaAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(Gasto)
+class GastoAdmin(admin.ModelAdmin):
+    """
+    Gestión completa de gastos.
+    """
+    list_display = (
+        'id_gasto', 'periodo', 'id_gasto_categ', 
+        'total', 'fecha_emision', 'id_proveedor'
+    )
+    list_filter = ('id_condominio', 'periodo', 'id_gasto_categ')
+    search_fields = ('descripcion', 'documento_folio', 'id_proveedor__nombre')
+    date_hierarchy = 'fecha_emision'
+    
+    # Usamos raw_id_fields para claves foráneas con muchos datos
+    raw_id_fields = ('id_condominio', 'id_proveedor')
+
+    fieldsets = (
+        ('Contexto', {
+            'fields': ('id_condominio', 'periodo', 'id_gasto_categ')
+        }),
+        ('Documento', {
+            'fields': ('id_proveedor', 'id_doc_tipo', 'documento_folio', 'fecha_emision', 'fecha_venc')
+        }),
+        ('Montos', {
+            'fields': ('neto', 'iva', 'total')
+        }),
+        ('Detalle', {
+            'fields': ('descripcion', 'evidencia_url')
+        }),
+    )
+    # 'total' es calculado, así que lo mostramos como solo lectura
+    readonly_fields = ('total',)
+
+# --- FIN: Admin de Gastos ---

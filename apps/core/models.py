@@ -424,3 +424,89 @@ class Suscripcion(models.Model):
         verbose_name_plural = 'Suscripciones de Usuario'
 
 # --- FIN: Modelos de Suscripción (SaaS) ---
+
+
+# --- INICIO: Modelos de Gastos (Sprint 2) ---
+
+class GastoCategoria(models.Model):
+    """
+    [MAPEO: Tabla 'gasto_categoria']
+    Categorías para agrupar gastos (ej: 'Reparaciones', 'Sueldos', 'Jardinería').
+    """
+    id_gasto_categ = models.AutoField(primary_key=True)
+    nombre = models.CharField(max_length=60, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        db_table = 'gasto_categoria'
+        verbose_name = 'Categoría de Gasto'
+        verbose_name_plural = 'Categorías de Gastos'
+
+class Gasto(models.Model):
+    """
+    [MAPEO: Tabla 'gasto']
+    Registro de un egreso de dinero del condominio.
+    """
+    id_gasto = models.AutoField(primary_key=True)
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.RESTRICT, # No borrar el condominio si tiene gastos registrados
+        db_column='id_condominio'
+    )
+    periodo = models.CharField(
+        max_length=6,
+        help_text="Periodo contable formato YYYYMM (ej: 202511)"
+    )
+    id_gasto_categ = models.ForeignKey(
+        GastoCategoria,
+        on_delete=models.RESTRICT, # No borrar la categoría si se usa en gastos
+        db_column='id_gasto_categ',
+        verbose_name='Categoría'
+    )
+    id_proveedor = models.ForeignKey(
+        Proveedor,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column='id_proveedor',
+        verbose_name='Proveedor'
+    )
+    id_doc_tipo = models.ForeignKey(
+        CatDocTipo,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column='id_doc_tipo',
+        verbose_name='Tipo Documento'
+    )
+    documento_folio = models.CharField(max_length=40, null=True, blank=True)
+    fecha_emision = models.DateField(null=True, blank=True)
+    fecha_venc = models.DateField(null=True, blank=True, verbose_name="Fecha Vencimiento")
+    
+    neto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    iva = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    # 'total' es una columna generada en SQL. En Django la calculamos antes de guardar.
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    descripcion = models.CharField(max_length=300, null=True, blank=True)
+    evidencia_url = models.URLField(max_length=500, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # Lógica de Negocio: El total siempre es la suma de neto + iva
+        self.total = self.neto + self.iva
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Gasto #{self.id_gasto} - {self.descripcion[:20]}..."
+
+    class Meta:
+        db_table = 'gasto'
+        verbose_name = 'Gasto'
+        verbose_name_plural = 'Gastos'
+        indexes = [
+            # Índice para búsquedas rápidas por condominio y periodo (Dashboards)
+            models.Index(fields=['id_condominio', 'periodo'], name='ix_gasto_periodo'),
+        ]
+
+# --- FIN: Modelos de Gastos ---
