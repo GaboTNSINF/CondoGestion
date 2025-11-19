@@ -3,6 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <title>Dashboard - CondoGestión</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn-logout {
+            background-color: #ff4444; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
     <h1>Bienvenido a CondoGestión</h1>
@@ -12,9 +25,40 @@
 
     <hr>
 
+    <h3>Mis Condominios</h3>
+
+    {% if mis_condominios %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>RUT</th>
+                    <th>Dirección</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for condo in mis_condominios %}
+                <tr>
+                    <td><strong>{{ condo.nombre }}</strong></td>
+                    <td>{{ condo.rut_base }}-{{ condo.rut_dv }}</td>
+                    <td>{{ condo.direccion|default:"Sin dirección registrada" }}</td>
+                    <td>
+                        <button>Gestionar</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No hay condominios registrados en el sistema.</p>
+    {% endif %}
+
+    <hr>
+
     <form action="{% url 'logout' %}" method="post">
         {% csrf_token %}
-        <button type="submit">Cerrar Sesión</button>
+        <button type="submit" class="btn-logout">Cerrar Sesión</button>
     </form>
 </body>
 </html>
