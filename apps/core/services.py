@@ -1,6 +1,10 @@
 from decimal import Decimal
 from django.db import transaction
-from .models import Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo
+from django.db.models import Sum
+from .models import (
+    Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
+    Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado
+)
 
 def calcular_factores_prorrateo(prorrateo_regla: ProrrateoRegla):
     """
@@ -80,3 +84,104 @@ def crear_regla_gasto_comun_default(condominio):
         calcular_factores_prorrateo(regla)
 
     return regla
+
+@transaction.atomic
+def generar_cierre_mensual(condominio, periodo):
+    """
+    Genera los cobros mensuales (Gastos Comunes) para un periodo dado.
+    1. Suma todos los gastos del periodo.
+    2. Obtiene la regla de prorrateo (Gasto Común) vigente.
+    3. Distribuye el total de gastos entre las unidades.
+    4. Crea los registros de Cobro y CobroDetalle.
+    """
+
+    # 1. Sumar gastos del periodo
+    # TODO: Filtrar solo gastos no anulados si existiera estado
+    total_gastos = Gasto.objects.filter(
+        id_condominio=condominio,
+        periodo=periodo
+    ).aggregate(Sum('total'))['total__sum'] or Decimal(0)
+
+    if total_gastos <= 0:
+        # Podríamos permitir cierre en 0, pero por ahora asumimos que debe haber gastos
+        # O simplemente generamos cobros en 0.
+        pass
+
+    # 2. Obtener regla de prorrateo vigente
+    # Asumimos una única regla ordinaria por defecto por ahora
+    # En un sistema real, buscaríamos la regla activa para la fecha del periodo
+    regla_prorrateo = ProrrateoRegla.objects.filter(
+        id_condominio=condominio,
+        tipo=ProrrateoRegla.TipoProrrateo.ORDINARIO
+    ).first()
+
+    if not regla_prorrateo:
+        # Si no existe, intentamos crear la default
+        regla_prorrateo = crear_regla_gasto_comun_default(condominio)
+
+    # Aseguramos que existan factores
+    if not ProrrateoFactorUnidad.objects.filter(id_prorrateo=regla_prorrateo).exists():
+        calcular_factores_prorrateo(regla_prorrateo)
+
+    factores = ProrrateoFactorUnidad.objects.filter(id_prorrateo=regla_prorrateo)
+
+    # Estado inicial del cobro (ej: 'EMITIDO' o 'BORRADOR')
+    # Vamos a asumir 'BORRADOR' o 'POR_PAGAR'.
+    # Creemos el estado si no existe
+    estado_pendiente, _ = CatCobroEstado.objects.get_or_create(codigo='PENDIENTE')
+
+    cobros_generados = []
+
+    # 3. Iterar por cada unidad y generar su cobro
+    for factor_obj in factores:
+        unidad = factor_obj.id_unidad
+        factor = factor_obj.factor
+
+        # Monto a cobrar a esta unidad
+        monto_prorrateado = total_gastos * factor
+        # Redondear (en Chile se usa peso entero, en otros lados 2 decimales)
+        # Usaremos 0 decimales para pesos (CLP) o 2 para USD según configuración,
+        # por defecto del modelo es 2 decimales.
+        monto_prorrateado = round(monto_prorrateado, 0)
+
+        # Crear el Cobro (Cabecera)
+        # Usamos update_or_create para permitir re-generar el cierre (idempotencia básica)
+        cobro, created = Cobro.objects.update_or_create(
+            id_unidad=unidad,
+            periodo=periodo,
+            tipo=Cobro.TipoCobro.MENSUAL,
+            defaults={
+                'id_cobro_estado': estado_pendiente,
+                'id_prorrateo': regla_prorrateo,
+                'total_cargos': monto_prorrateado, # Por ahora solo este cargo
+                'saldo': monto_prorrateado,        # Asumiendo 0 pagos previos
+                'observacion': f"Cierre Mensual {periodo}"
+            }
+        )
+
+        # Crear el Detalle (Cargo por Gasto Común)
+        # Primero creamos el CargoUnidad (Registro histórico del cargo)
+        cargo_uni, _ = CargoUnidad.objects.update_or_create(
+            id_unidad=unidad,
+            periodo=periodo,
+            id_concepto_cargo=regla_prorrateo.id_concepto_cargo,
+            defaults={
+                'monto': monto_prorrateado,
+                'detalle': f"Gasto Común Prorrateado (Factor: {factor:.6f})"
+            }
+        )
+
+        # Luego el detalle en el cobro
+        CobroDetalle.objects.update_or_create(
+            id_cobro=cobro,
+            tipo=CobroDetalle.TipoDetalle.CARGO_COMUN,
+            id_cargo_uni=cargo_uni,
+            defaults={
+                'monto': monto_prorrateado,
+                'glosa': "Gasto Común del Periodo"
+            }
+        )
+
+        cobros_generados.append(cobro)
+
+    return cobros_generados

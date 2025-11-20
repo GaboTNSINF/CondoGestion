@@ -617,3 +617,180 @@ class ProrrateoFactorUnidad(models.Model):
         unique_together = ('id_prorrateo', 'id_unidad')
 
 # --- FIN: Modelos de Prorrateo ---
+
+
+# --- INICIO: Modelos de Cobro (Mensual) ---
+
+class CatCobroEstado(models.Model):
+    """
+    [MAPEO: Tabla 'cat_cobro_estado']
+    Estados del cobro: 'Borrador', 'Emitido', 'Pagado', etc.
+    """
+    id_cobro_estado = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=20, unique=True)
+
+    def __str__(self):
+        return self.codigo
+
+    class Meta:
+        db_table = 'cat_cobro_estado'
+        verbose_name = 'Catálogo: Estado de Cobro'
+        verbose_name_plural = 'Catálogo: Estados de Cobro'
+
+class CargoUnidad(models.Model):
+    """
+    [MAPEO: Tabla 'cargo_unidad']
+    Cargos asignados a una unidad en un periodo específico.
+    Pueden ser generados por prorrateo o manuales.
+    """
+    id_cargo_uni = models.AutoField(primary_key=True)
+    id_unidad = models.ForeignKey(
+        Unidad,
+        on_delete=models.RESTRICT,
+        db_column='id_unidad'
+    )
+    periodo = models.CharField(max_length=6)
+    id_concepto_cargo = models.ForeignKey(
+        CatConceptoCargo,
+        on_delete=models.RESTRICT,
+        db_column='id_concepto_cargo'
+    )
+
+    class TipoCargo(models.TextChoices):
+        NORMAL = 'normal', 'Normal'
+        EXTRA = 'extra', 'Extra'
+        AJUSTE = 'ajuste', 'Ajuste'
+
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoCargo.choices,
+        default=TipoCargo.NORMAL
+    )
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    detalle = models.CharField(max_length=300, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'cargo_unidad'
+        indexes = [
+            models.Index(fields=['periodo', 'id_unidad'], name='ix_cargo_periodo_unidad'),
+        ]
+
+class CargoIndividual(models.Model):
+    """
+    [MAPEO: Tabla 'cargo_individual']
+    Cargos directos a una unidad que NO dependen de prorrateo masivo
+    (ej: Multas, reserva de quincho).
+    """
+    id_cargo_indv = models.AutoField(primary_key=True)
+    id_unidad = models.ForeignKey(
+        Unidad,
+        on_delete=models.RESTRICT,
+        db_column='id_unidad'
+    )
+    periodo = models.CharField(max_length=6)
+    tipo = models.CharField(max_length=30)
+    referencia = models.CharField(max_length=60, null=True, blank=True)
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    detalle = models.CharField(max_length=300, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'cargo_individual'
+
+class Cobro(models.Model):
+    """
+    [MAPEO: Tabla 'cobro']
+    Representa la 'Boleta' o 'Aviso de Cobro' mensual para una unidad.
+    Agrupa todos los cargos y descuentos.
+    """
+    id_cobro = models.AutoField(primary_key=True)
+    id_unidad = models.ForeignKey(
+        Unidad,
+        on_delete=models.RESTRICT,
+        db_column='id_unidad'
+    )
+    periodo = models.CharField(max_length=6)
+    emitido_at = models.DateTimeField(auto_now_add=True)
+
+    id_cobro_estado = models.ForeignKey(
+        CatCobroEstado,
+        on_delete=models.RESTRICT,
+        db_column='id_cobro_estado'
+    )
+
+    class TipoCobro(models.TextChoices):
+        MENSUAL = 'mensual', 'Mensual'
+        EXTRAORDINARIO = 'extraordinario', 'Extraordinario'
+        MANUAL = 'manual', 'Manual'
+
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoCobro.choices,
+        default=TipoCobro.MENSUAL
+    )
+
+    id_prorrateo = models.ForeignKey(
+        ProrrateoRegla,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column='id_prorrateo'
+    )
+
+    total_cargos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_descuentos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_interes = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_pagado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    saldo = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    observacion = models.CharField(max_length=300, null=True, blank=True)
+
+    class Meta:
+        db_table = 'cobro'
+        unique_together = ('id_unidad', 'periodo', 'tipo')
+
+class CobroDetalle(models.Model):
+    """
+    [MAPEO: Tabla 'cobro_detalle']
+    Línea de detalle del cobro. Vincula un Cargo (Unidad o Individual) al Cobro.
+    """
+    id_cobro_det = models.AutoField(primary_key=True)
+    id_cobro = models.ForeignKey(
+        Cobro,
+        on_delete=models.CASCADE,
+        db_column='id_cobro'
+    )
+
+    class TipoDetalle(models.TextChoices):
+        CARGO_COMUN = 'cargo_comun', 'Gasto Común (Prorrateo)'
+        CARGO_INDIVIDUAL = 'cargo_individual', 'Cargo Individual'
+        INTERES_MORA = 'interes_mora', 'Interés por Mora'
+        DESCUENTO = 'descuento', 'Descuento'
+        AJUSTE = 'ajuste', 'Ajuste'
+
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoDetalle.choices
+    )
+
+    id_cargo_uni = models.ForeignKey(
+        CargoUnidad,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column='id_cargo_uni'
+    )
+    id_cargo_indv = models.ForeignKey(
+        CargoIndividual,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column='id_cargo_indv'
+    )
+
+    # id_interes_regla ... (omitido por ahora, parte de otro sprint)
+
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    glosa = models.CharField(max_length=300, null=True, blank=True)
+
+    class Meta:
+        db_table = 'cobro_detalle'
+
+# --- FIN: Modelos de Cobro ---
