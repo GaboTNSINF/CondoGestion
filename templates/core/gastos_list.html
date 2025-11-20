@@ -30,9 +30,9 @@
 
     <hr>
 
-    <div style="margin-bottom: 20px;">
+    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
         <h3>Listado de Gastos Registrados</h3>
-        <!-- Aquí irá el botón para crear nuevo gasto en el futuro -->
+        <a href="{% url 'gasto_create' condominio.id_condominio %}" class="btn btn-primary">Nuevo Gasto</a>
     </div>
 
     {% if gastos %}
