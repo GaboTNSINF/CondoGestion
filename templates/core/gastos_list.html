@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gastos - {{ condominio.nombre }}</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .header { display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 8px 16px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .status-paid { color: green; font-weight: bold; }
+        .status-pending { color: orange; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Gastos Comunes</h1>
+            <h2>{{ condominio.nombre }}</h2>
+        </div>
+        <div>
+            <a href="{% url 'index' %}" class="btn btn-secondary">Volver al Dashboard</a>
+        </div>
+    </div>
+
+    <hr>
+
+    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+        <h3>Listado de Gastos Registrados</h3>
+        <a href="{% url 'gasto_create' condominio.id_condominio %}" class="btn btn-primary">Nuevo Gasto</a>
+    </div>
+
+    {% if gastos %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Periodo</th>
+                    <th>Fecha Emisión</th>
+                    <th>Categoría</th>
+                    <th>Proveedor</th>
+                    <th>Documento</th>
+                    <th>Folio</th>
+                    <th>Descripción</th>
+                    <th>Monto Total</th>
+                    <th>Evidencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gasto in gastos %}
+                <tr>
+                    <td>{{ gasto.periodo }}</td>
+                    <td>{{ gasto.fecha_emision|date:"d/m/Y" }}</td>
+                    <td>{{ gasto.id_gasto_categ.nombre }}</td>
+                    <td>
+                        {% if gasto.id_proveedor %}
+                            {{ gasto.id_proveedor.nombre }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if gasto.id_doc_tipo %}
+                            {{ gasto.id_doc_tipo.nombre }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ gasto.documento_folio|default:"-" }}</td>
+                    <td>{{ gasto.descripcion|default:"-" }}</td>
+                    <td>$ {{ gasto.total|floatformat:0 }}</td>
+                    <td>
+                        {% if gasto.evidencia_url %}
+                            <a href="{{ gasto.evidencia_url }}" target="_blank">Ver</a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No hay gastos registrados para este condominio.</p>
+    {% endif %}
+
+</body>
+</html>

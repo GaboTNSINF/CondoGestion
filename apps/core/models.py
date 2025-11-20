@@ -111,6 +111,23 @@ class CatDocTipo(models.Model):
         verbose_name = 'Catálogo: Tipo de Documento'
         verbose_name_plural = 'Catálogo: Tipos de Documento'
 
+class CatConceptoCargo(models.Model):
+    """
+    [MAPEO: Tabla 'cat_concepto_cargo']
+    Catálogo para conceptos de cargos (ej: 'Gasto Común', 'Fondo de Reserva').
+    """
+    id_concepto_cargo = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=30, unique=True)
+    nombre = models.CharField(max_length=60, null=True, blank=True)
+
+    def __str__(self):
+        return self.nombre or self.codigo
+
+    class Meta:
+        db_table = 'cat_concepto_cargo'
+        verbose_name = 'Catálogo: Concepto de Cargo'
+        verbose_name_plural = 'Catálogo: Conceptos de Cargos'
+
 # --- FIN: Catálogos de Gastos y Pagos ---
 
 
@@ -510,3 +527,93 @@ class Gasto(models.Model):
         ]
 
 # --- FIN: Modelos de Gastos ---
+
+
+# --- INICIO: Modelos de Prorrateo ---
+
+class ProrrateoRegla(models.Model):
+    """
+    [MAPEO: Tabla 'prorrateo_regla']
+    Define cómo se deben distribuir (prorratear) ciertos gastos o cargos.
+    """
+    id_prorrateo = models.AutoField(primary_key=True)
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.RESTRICT,
+        db_column='id_condominio'
+    )
+    id_concepto_cargo = models.ForeignKey(
+        CatConceptoCargo,
+        on_delete=models.RESTRICT,
+        db_column='id_concepto_cargo'
+    )
+
+    class TipoProrrateo(models.TextChoices):
+        ORDINARIO = 'ordinario', 'Ordinario'
+        EXTRA = 'extra', 'Extraordinario'
+        ESPECIAL = 'especial', 'Especial'
+
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoProrrateo.choices,
+        default=TipoProrrateo.ORDINARIO
+    )
+
+    class CriterioProrrateo(models.TextChoices):
+        COEF_PROP = 'coef_prop', 'Coeficiente de Propiedad'
+        POR_M2 = 'por_m2', 'Por Metros Cuadrados'
+        IGUALITARIO = 'igualitario', 'Igualitario'
+        POR_TIPO = 'por_tipo', 'Por Tipo de Unidad'
+        MONTO_FIJO = 'monto_fijo', 'Monto Fijo'
+
+    criterio = models.CharField(
+        max_length=20,
+        choices=CriterioProrrateo.choices
+    )
+
+    monto_total = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    peso_vivienda = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    peso_bodega = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    peso_estacionamiento = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+
+    vigente_desde = models.DateField()
+    vigente_hasta = models.DateField(null=True, blank=True)
+    descripcion = models.CharField(max_length=300, null=True, blank=True)
+
+    def __str__(self):
+        return f"Regla {self.tipo} - {self.criterio} ({self.vigente_desde})"
+
+    class Meta:
+        db_table = 'prorrateo_regla'
+        verbose_name = 'Regla de Prorrateo'
+        verbose_name_plural = 'Reglas de Prorrateo'
+        unique_together = ('id_condominio', 'id_concepto_cargo', 'vigente_desde', 'tipo')
+
+class ProrrateoFactorUnidad(models.Model):
+    """
+    [MAPEO: Tabla 'prorrateo_factor_unidad']
+    Almacena el factor calculado para una unidad específica bajo una regla de prorrateo.
+    """
+    id_factor = models.AutoField(primary_key=True)
+    id_prorrateo = models.ForeignKey(
+        ProrrateoRegla,
+        on_delete=models.CASCADE,
+        db_column='id_prorrateo'
+    )
+    id_unidad = models.ForeignKey(
+        Unidad,
+        on_delete=models.CASCADE,
+        db_column='id_unidad'
+    )
+    factor = models.DecimalField(max_digits=12, decimal_places=6)
+
+    def __str__(self):
+        return f"Factor {self.factor} para U. {self.id_unidad_id}"
+
+    class Meta:
+        db_table = 'prorrateo_factor_unidad'
+        verbose_name = 'Factor de Prorrateo por Unidad'
+        verbose_name_plural = 'Factores de Prorrateo por Unidad'
+        unique_together = ('id_prorrateo', 'id_unidad')
+
+# --- FIN: Modelos de Prorrateo ---
