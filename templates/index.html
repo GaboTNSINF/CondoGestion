@@ -44,7 +44,9 @@
                     <td>{{ condo.rut_base }}-{{ condo.rut_dv }}</td>
                     <td>{{ condo.direccion|default:"Sin dirección registrada" }}</td>
                     <td>
-                        <button>Gestionar</button>
+                        <a href="{% url 'gastos_list' condo.id_condominio %}">Gastos</a> |
+                        <a href="{% url 'cierre_mensual' condo.id_condominio %}">Cierre</a> |
+                        <a href="{% url 'pagos_list' condo.id_condominio %}">Pagos</a>
                     </td>
                 </tr>
                 {% endfor %}

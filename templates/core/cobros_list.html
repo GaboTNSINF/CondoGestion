@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cobros {{ periodo }} - {{ condominio.nombre }}</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn { padding: 8px 16px; border: none; cursor: pointer; text-decoration: none; display: inline-block; border-radius: 4px; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+
+    <h1>Cobros Generados</h1>
+    <h2>{{ condominio.nombre }} - Periodo {{ periodo }}</h2>
+
+    <div style="margin-bottom: 20px;">
+        <a href="{% url 'cierre_mensual' condominio.id_condominio %}?periodo={{ periodo }}" class="btn btn-secondary">Volver al Cierre</a>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Unidad</th>
+                <th>Estado</th>
+                <th>Total Cargos</th>
+                <th>Total Pagado</th>
+                <th>Saldo a Pagar</th>
+                <th>Observación</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cobro in cobros %}
+            <tr>
+                <td><strong>{{ cobro.id_unidad.codigo }}</strong></td>
+                <td>{{ cobro.id_cobro_estado.codigo }}</td>
+                <td>$ {{ cobro.total_cargos|floatformat:0 }}</td>
+                <td>$ {{ cobro.total_pagado|floatformat:0 }}</td>
+                <td><strong>$ {{ cobro.saldo|floatformat:0 }}</strong></td>
+                <td>{{ cobro.observacion }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>
