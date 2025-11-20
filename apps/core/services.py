@@ -3,7 +3,8 @@ from django.db import transaction
 from django.db.models import Sum
 from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
-    Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado
+    Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
+    CatMetodoPago
 )
 
 def calcular_factores_prorrateo(prorrateo_regla: ProrrateoRegla):
@@ -185,3 +186,69 @@ def generar_cierre_mensual(condominio, periodo):
         cobros_generados.append(cobro)
 
     return cobros_generados
+
+@transaction.atomic
+def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None):
+    """
+    Registra un pago y lo aplica a la deuda más antigua (FIFO).
+    """
+    # 1. Crear el registro de Pago
+    pago = Pago.objects.create(
+        id_unidad=unidad,
+        monto=monto,
+        id_metodo_pago=metodo_pago,
+        fecha_pago=fecha_pago,
+        observacion=observacion,
+        tipo=Pago.TipoPago.NORMAL
+    )
+
+    monto_disponible = monto
+
+    # 2. Buscar cobros con saldo > 0, ordenados por fecha de emisión (los más antiguos primero)
+    # Asumimos que 'id_cobro' autoincremental refleja el orden cronológico de creación también,
+    # o usamos 'emitido_at'.
+    cobros_pendientes = Cobro.objects.filter(
+        id_unidad=unidad,
+        saldo__gt=0
+    ).order_by('emitido_at', 'id_cobro')
+
+    estado_pagado, _ = CatCobroEstado.objects.get_or_create(codigo='PAGADO')
+
+    # 3. Aplicar pago a las deudas
+    for cobro in cobros_pendientes:
+        if monto_disponible <= 0:
+            break
+
+        saldo_cobro = cobro.saldo
+
+        if monto_disponible >= saldo_cobro:
+            # Pagamos el cobro completo
+            monto_a_aplicar = saldo_cobro
+            monto_disponible -= saldo_cobro
+
+            cobro.saldo = 0
+            cobro.total_pagado += monto_a_aplicar
+            cobro.id_cobro_estado = estado_pagado
+            cobro.save()
+        else:
+            # Pago parcial del cobro
+            monto_a_aplicar = monto_disponible
+            monto_disponible = 0
+
+            cobro.saldo -= monto_a_aplicar
+            cobro.total_pagado += monto_a_aplicar
+            # Estado sigue siendo pendiente/parcial, no cambiamos a PAGADO
+            cobro.save()
+
+        # Crear registro de aplicación
+        PagoAplicacion.objects.create(
+            id_pago=pago,
+            id_cobro=cobro,
+            monto_aplicado=monto_a_aplicar
+        )
+
+    # Si queda saldo a favor (monto_disponible > 0), queda como abono en el pago (no aplicado).
+    # En un sistema real, se generaría un 'Saldo a Favor' para futuros cobros.
+    # Aquí simplemente queda registrado el pago con monto mayor a lo aplicado.
+
+    return pago

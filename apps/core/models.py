@@ -794,3 +794,173 @@ class CobroDetalle(models.Model):
         db_table = 'cobro_detalle'
 
 # --- FIN: Modelos de Cobro ---
+
+
+# --- INICIO: Modelos de Pagos ---
+
+class CatMetodoPago(models.Model):
+    """
+    [MAPEO: Tabla 'cat_metodo_pago']
+    Catálogo de métodos de pago (Transferencia, Cheque, Webpay, etc).
+    """
+    id_metodo_pago = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=30, unique=True)
+    nombre = models.CharField(max_length=60)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        db_table = 'cat_metodo_pago'
+        verbose_name = 'Catálogo: Método de Pago'
+        verbose_name_plural = 'Catálogo: Métodos de Pago'
+
+class CatPasarela(models.Model):
+    """
+    [MAPEO: Tabla 'cat_pasarela']
+    Catálogo de pasarelas de pago (Webpay, MercadoPago, Stripe).
+    """
+    id_pasarela = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=30, unique=True)
+
+    def __str__(self):
+        return self.codigo
+
+    class Meta:
+        db_table = 'cat_pasarela'
+        verbose_name = 'Catálogo: Pasarela de Pago'
+        verbose_name_plural = 'Catálogo: Pasarelas de Pago'
+
+class CatEstadoTx(models.Model):
+    """
+    [MAPEO: Tabla 'cat_estado_tx']
+    Estados de transacción de pasarela (Iniciada, Aprobada, Rechazada).
+    """
+    id_estado_tx = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=30, unique=True)
+
+    def __str__(self):
+        return self.codigo
+
+    class Meta:
+        db_table = 'cat_estado_tx'
+        verbose_name = 'Catálogo: Estado Transacción'
+        verbose_name_plural = 'Catálogo: Estados Transacción'
+
+class Pago(models.Model):
+    """
+    [MAPEO: Tabla 'pago']
+    Registro de un ingreso de dinero por parte de una unidad.
+    """
+    id_pago = models.AutoField(primary_key=True)
+    id_unidad = models.ForeignKey(
+        Unidad,
+        on_delete=models.RESTRICT,
+        db_column='id_unidad'
+    )
+    fecha_pago = models.DateTimeField()
+    periodo = models.CharField(max_length=6, null=True, blank=True)
+
+    class TipoPago(models.TextChoices):
+        NORMAL = 'normal', 'Normal'
+        ANTICIPO = 'anticipo', 'Anticipo'
+        AJUSTE = 'ajuste', 'Ajuste'
+
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoPago.choices,
+        default=TipoPago.NORMAL
+    )
+
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+
+    id_metodo_pago = models.ForeignKey(
+        CatMetodoPago,
+        on_delete=models.RESTRICT,
+        db_column='id_metodo_pago'
+    )
+
+    ref_externa = models.CharField(max_length=120, null=True, blank=True)
+    observacion = models.CharField(max_length=300, null=True, blank=True)
+
+    def __str__(self):
+        return f"Pago {self.id_pago} - U.{self.id_unidad.codigo} - ${self.monto}"
+
+    class Meta:
+        db_table = 'pago'
+        indexes = [
+            models.Index(fields=['id_unidad', 'periodo'], name='ix_pago_unidad_periodo'),
+            models.Index(fields=['id_unidad', 'fecha_pago'], name='ix_pago_unidad_fecha'),
+        ]
+
+class ComprobantePago(models.Model):
+    """
+    [MAPEO: Tabla 'comprobante_pago']
+    Documento PDF o similar que respalda el pago.
+    """
+    id_compr_pago = models.AutoField(primary_key=True)
+    id_pago = models.OneToOneField(
+        Pago,
+        on_delete=models.CASCADE,
+        db_column='id_pago'
+    )
+    folio = models.CharField(max_length=40, unique=True)
+    url_pdf = models.CharField(max_length=500, null=True, blank=True)
+    emitido_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'comprobante_pago'
+
+class PagoAplicacion(models.Model):
+    """
+    [MAPEO: Tabla 'pago_aplicacion']
+    Relación Many-to-Many entre Pago y Cobro.
+    Indica qué parte de un pago se destinó a saldar qué cobro.
+    """
+    id_pago_aplic = models.AutoField(primary_key=True)
+    id_pago = models.ForeignKey(
+        Pago,
+        on_delete=models.CASCADE,
+        db_column='id_pago'
+    )
+    id_cobro = models.ForeignKey(
+        Cobro,
+        on_delete=models.CASCADE,
+        db_column='id_cobro'
+    )
+    monto_aplicado = models.DecimalField(max_digits=12, decimal_places=2)
+    aplicado_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'pago_aplicacion'
+        unique_together = ('id_pago', 'id_cobro')
+
+class PasarelaTx(models.Model):
+    """
+    [MAPEO: Tabla 'pasarela_tx']
+    Detalle técnico de la transacción con pasarela de pagos.
+    """
+    id_pasarela_tx = models.AutoField(primary_key=True)
+    id_pago = models.ForeignKey(
+        Pago,
+        on_delete=models.CASCADE,
+        db_column='id_pago'
+    )
+    id_pasarela = models.ForeignKey(
+        CatPasarela,
+        on_delete=models.RESTRICT,
+        db_column='id_pasarela'
+    )
+    id_estado_tx = models.ForeignKey(
+        CatEstadoTx,
+        on_delete=models.RESTRICT,
+        db_column='id_estado_tx'
+    )
+    payload_json = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'pasarela_tx'
+
+# --- FIN: Modelos de Pagos ---

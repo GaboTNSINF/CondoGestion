@@ -1,5 +1,5 @@
 from django import forms
-from .models import Gasto
+from .models import Gasto, Pago, CatMetodoPago
 
 class GastoForm(forms.ModelForm):
     class Meta:
@@ -37,3 +37,27 @@ class GastoForm(forms.ModelForm):
             'documento_folio': 'Folio Documento',
             'evidencia_url': 'URL Evidencia (opcional)',
         }
+
+class PagoForm(forms.ModelForm):
+    class Meta:
+        model = Pago
+        fields = ['id_unidad', 'monto', 'id_metodo_pago', 'fecha_pago', 'observacion']
+        widgets = {
+            'id_unidad': forms.Select(attrs={'class': 'form-control'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control'}),
+            'id_metodo_pago': forms.Select(attrs={'class': 'form-control'}),
+            'fecha_pago': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'observacion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+        }
+        labels = {
+            'id_unidad': 'Unidad',
+            'id_metodo_pago': 'Método de Pago',
+        }
+
+    def __init__(self, *args, **kwargs):
+        condominio_id = kwargs.pop('condominio_id', None)
+        super().__init__(*args, **kwargs)
+        if condominio_id:
+            # Filter units by condominio
+            from .models import Unidad
+            self.fields['id_unidad'].queryset = Unidad.objects.filter(id_grupo__id_condominio_id=condominio_id)

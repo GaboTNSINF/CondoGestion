@@ -6,9 +6,9 @@ from django.contrib import messages
 from django.db.models import Sum
 
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
-from .models import Condominio, Gasto, Cobro
-from .forms import GastoForm
-from .services import generar_cierre_mensual
+from .models import Condominio, Gasto, Cobro, Pago
+from .forms import GastoForm, PagoForm
+from .services import generar_cierre_mensual, registrar_pago
 
 # --- INICIO: Vistas del Dashboard ---
 
@@ -155,3 +155,58 @@ def cobros_list_view(request, condominio_id, periodo):
     return render(request, 'core/cobros_list.html', contexto)
 
 # --- FIN: Vistas de Cierre Mensual y Cobros ---
+
+
+# --- INICIO: Vistas de Pagos ---
+
+@login_required
+def pago_create_view(request, condominio_id):
+    """
+    Vista para registrar un nuevo pago manualmente.
+    """
+    condominio = get_object_or_404(Condominio, pk=condominio_id)
+
+    if request.method == 'POST':
+        form = PagoForm(request.POST, condominio_id=condominio_id)
+        if form.is_valid():
+            data = form.cleaned_data
+            try:
+                registrar_pago(
+                    unidad=data['id_unidad'],
+                    monto=data['monto'],
+                    metodo_pago=data['id_metodo_pago'],
+                    fecha_pago=data['fecha_pago'],
+                    observacion=data['observacion']
+                )
+                messages.success(request, "Pago registrado exitosamente.")
+                return redirect('pagos_list', condominio_id=condominio.id_condominio)
+            except Exception as e:
+                messages.error(request, f"Error al registrar pago: {str(e)}")
+    else:
+        form = PagoForm(condominio_id=condominio_id)
+
+    contexto = {
+        'form': form,
+        'condominio': condominio
+    }
+    return render(request, 'core/pago_form.html', contexto)
+
+@login_required
+def pagos_list_view(request, condominio_id):
+    """
+    Lista los pagos registrados para un condominio.
+    """
+    condominio = get_object_or_404(Condominio, pk=condominio_id)
+
+    pagos = Pago.objects.filter(
+        id_unidad__id_grupo__id_condominio=condominio
+    ).select_related('id_unidad', 'id_metodo_pago').order_by('-fecha_pago')
+
+    contexto = {
+        'condominio': condominio,
+        'pagos': pagos
+    }
+
+    return render(request, 'core/pagos_list.html', contexto)
+
+# --- FIN: Vistas de Pagos ---
