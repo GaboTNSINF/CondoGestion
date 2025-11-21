@@ -10,21 +10,51 @@
     </div>
 </div>
 
+<div class="row g-2 mb-4 row-cols-3 row-cols-md-3">
+    <div class="col">
+        <a href="#" class="card bg-white border shadow-sm h-100 text-decoration-none">
+            <div class="card-body text-center p-2 p-md-3">
+                <i class="fa-solid fa-user-gear fa-2x text-primary mb-2"></i>
+                <h6 class="card-title text-dark small mb-0">Mi Perfil</h6>
+                <small class="text-muted d-none d-md-block">Gestionar datos</small>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a href="#" class="card bg-white border shadow-sm h-100 text-decoration-none">
+            <div class="card-body text-center p-2 p-md-3">
+                <i class="fa-solid fa-circle-question fa-2x text-info mb-2"></i>
+                <h6 class="card-title text-dark small mb-0">Ayuda</h6>
+                <small class="text-muted d-none d-md-block">Soporte técnico</small>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a href="#" class="card bg-white border shadow-sm h-100 text-decoration-none">
+            <div class="card-body text-center p-2 p-md-3">
+                <i class="fa-solid fa-bell fa-2x text-warning mb-2"></i>
+                <h6 class="card-title text-dark small mb-0">Avisos</h6>
+                <small class="text-muted d-none d-md-block">Novedades</small>
+            </div>
+        </a>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-12">
         <h5 class="mb-3">Mis Condominios</h5>
 
         {% if mis_condominios %}
-            <div class="row g-3">
+            <div class="row g-3 justify-content-center">
                 {% for condo in mis_condominios %}
                 <div class="col-12 col-md-6 col-lg-4">
-                    <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="text-primary"><i class="fa-solid fa-building me-2"></i>{{ condo.nombre }}</span>
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                            <span class="text-primary fw-bold"><i class="fa-solid fa-building me-2"></i>{{ condo.nombre }}</span>
                             <span class="badge bg-light text-dark border">{{ condo.rut_base }}-{{ condo.rut_dv }}</span>
                         </div>
                         <div class="card-body">
-                            <p class="card-text text-muted mb-3">
+                            <p class="card-text text-muted mb-3 small">
                                 <i class="fa-solid fa-location-dot me-1"></i>
                                 {{ condo.direccion|default:"Sin dirección" }}
                             </p>
