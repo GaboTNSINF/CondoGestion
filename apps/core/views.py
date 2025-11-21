@@ -6,9 +6,9 @@ from django.contrib import messages
 from django.db.models import Sum
 
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
-from .models import Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion
+from .models import Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion, Notificacion
 from .forms import GastoForm, PagoForm, TrabajadorForm, RemuneracionForm
-from .services import generar_cierre_mensual, registrar_pago
+from .services import generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto
 
 # --- INICIO: Vistas del Dashboard ---
 
@@ -29,6 +29,25 @@ def index_view(request):
     }
     
     return render(request, 'index.html', contexto)
+
+@login_required
+def avisos_list_view(request):
+    """
+    Muestra las notificaciones del usuario.
+    """
+    notificaciones = Notificacion.objects.filter(usuario=request.user).order_by('-created_at')
+
+    # Marcar como leídas (opcional, para este MVP simplemente las listamos)
+    # notificaciones.update(leido=True)
+
+    return render(request, 'core/avisos_list.html', {'notificaciones': notificaciones})
+
+@login_required
+def soporte_view(request):
+    """
+    Vista estática de soporte.
+    """
+    return render(request, 'core/soporte.html')
 
 # --- FIN: Vistas del Dashboard ---
 
@@ -65,10 +84,8 @@ def gasto_create_view(request, condominio_id):
     if request.method == 'POST':
         form = GastoForm(request.POST)
         if form.is_valid():
-            # No guardamos inmediatamente para asignar el condominio
-            gasto = form.save(commit=False)
-            gasto.id_condominio = condominio
-            gasto.save()
+            # Delegamos la creación al servicio para asegurar auditoría
+            crear_gasto(condominio, form, request.user)
             return redirect('gastos_list', condominio_id=condominio.id_condominio)
     else:
         form = GastoForm()
@@ -176,7 +193,8 @@ def pago_create_view(request, condominio_id):
                     monto=data['monto'],
                     metodo_pago=data['id_metodo_pago'],
                     fecha_pago=data['fecha_pago'],
-                    observacion=data['observacion']
+                    observacion=data['observacion'],
+                    usuario=request.user  # Pasamos el usuario para auditoría
                 )
                 messages.success(request, "Pago registrado exitosamente.")
                 return redirect('pagos_list', condominio_id=condominio.id_condominio)

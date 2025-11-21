@@ -68,6 +68,7 @@
         var inputs = document.querySelectorAll('input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="date"], input[type="datetime-local"], select, textarea');
         inputs.forEach(function(input) {
             input.classList.add('form-control');
+            input.classList.add('form-control-lg'); // Mobile-first: larger inputs
         });
     });
 </script>

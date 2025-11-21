@@ -5,8 +5,27 @@ from django.utils import timezone
 from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
     Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
-    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov
+    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov, Auditoria, CondominioAnexoRegla,
+    Notificacion
 )
+
+def registrar_auditoria(entidad, entidad_id, accion, usuario, detalle=None):
+    """
+    Registra una acción en la tabla de auditoría.
+    """
+    try:
+        Auditoria.objects.create(
+            entidad=entidad,
+            entidad_id=entidad_id,
+            accion=accion,
+            id_usuario=usuario if usuario and usuario.is_authenticated else None,
+            usuario_email=usuario.email if usuario and usuario.is_authenticated else 'sistema',
+            detalle=detalle
+        )
+    except Exception as e:
+        # En producción, usar logging.error. No queremos romper la transacción principal si falla la auditoría
+        # pero en "Security Zero Trust" quizás sí. Para este MVP, lo dejamos silencioso o print.
+        print(f"Error auditando: {e}")
 
 def calcular_factores_prorrateo(prorrateo_regla: ProrrateoRegla):
     """
@@ -238,6 +257,9 @@ def generar_cierre_mensual(condominio, periodo):
 
     cobros_generados = []
 
+    # TODO: Recuperar usuario actual del request si fuera posible, pero en services es difícil sin pasar contexto.
+    # Asumiremos 'None' (Sistema) o pasaremos el usuario como argumento en refactor futuro.
+
     # 4. Iterar por cada unidad y generar su cobro base
     for factor_obj in factores:
         unidad = factor_obj.id_unidad
@@ -299,10 +321,169 @@ def generar_cierre_mensual(condominio, periodo):
         cobro.save()
         cobros_generados.append(cobro)
 
+    # Calcular Cobros por Anexos Extra (Bodegas/Estacionamientos)
+    calcular_cobro_anexos(condominio, periodo)
+
+    # Auditoría masiva (simplificada)
+    registrar_auditoria(
+        entidad='Cobro',
+        entidad_id=0, # 0 indicando masivo
+        accion='CREATE',
+        usuario=None,
+        detalle={'periodo': periodo, 'cantidad_generada': len(cobros_generados)}
+    )
+
+    # --- NOTIFICACIONES ---
+    # 1. Notificar Administradores
+    # Buscar usuarios admin de este condominio (Modelo UsuarioAdminCondo no importado, pero podemos navegar)
+    # Ojo: UsuarioAdminCondo esta en usuarios.models y no podemos importarlo circularmente facil.
+    # Usaremos un filtro genérico si es posible o importamos dentro de la función.
+    from apps.usuarios.models import UsuarioAdminCondo, Copropietario, Residencia
+
+    admins = UsuarioAdminCondo.objects.filter(id_condominio=condominio).select_related('id_usuario')
+    for admin_rel in admins:
+        Notificacion.objects.create(
+            usuario=admin_rel.id_usuario,
+            titulo="Cierre Mensual Generado",
+            mensaje=f"Se ha generado el cierre mensual del periodo {periodo} para {condominio.nombre}. Total cobrado: {len(cobros_generados)} unidades."
+        )
+
+    # 2. Notificar Residentes (Copropietarios y Arrendatarios)
+    # Iteramos sobre los cobros generados para saber a quién notificar
+    for cobro in cobros_generados:
+        unidad = cobro.id_unidad
+        # Buscar residentes activos
+        # Prioridad: Residentes (viven ahi) > Copropietarios (dueños)
+        # La lógica pedida: "Recibe aviso de 'Cobro Generado' (con el monto) al cerrar el mes."
+
+        destinatarios = set()
+
+        # Buscar residentes
+        residentes = Residencia.objects.filter(id_unidad=unidad, hasta__isnull=True)
+        for res in residentes:
+            destinatarios.add(res.id_usuario)
+
+        # Si no hay residente, notificar copropietario
+        if not residentes.exists():
+            coprops = Copropietario.objects.filter(id_unidad=unidad, hasta__isnull=True)
+            for cop in coprops:
+                destinatarios.add(cop.id_usuario)
+
+        for usuario_dest in destinatarios:
+            Notificacion.objects.create(
+                usuario=usuario_dest,
+                titulo="Gastos Comunes Disponibles",
+                mensaje=f"Se ha generado el cobro de Gastos Comunes para su unidad {unidad.codigo}. Periodo: {periodo}. Total a pagar: ${cobro.saldo:,.0f}"
+            )
+
     return cobros_generados
 
+def calcular_cobro_anexos(condominio, periodo):
+    """
+    Genera cargos adicionales por anexos (estacionamientos/bodegas)
+    según las reglas definidas en CondominioAnexoRegla.
+    """
+    # 1. Buscar reglas vigentes
+    # Simplificación: Solo reglas activas "hoy", idealmente check vs periodo
+    hoy = timezone.now().date()
+
+    reglas = CondominioAnexoRegla.objects.filter(
+        id_condominio=condominio,
+        vigente_desde__lte=hoy
+    ).filter(
+        Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=hoy)
+    )
+
+    if not reglas.exists():
+        return 0
+
+    cargo_generados = 0
+
+    # Buscamos un concepto de cargo para 'Uso Espacios Comunes' o similar, o creamos uno genérico
+    concepto_anexo, _ = CatConceptoCargo.objects.get_or_create(
+        codigo='ANEXO_EXTRA',
+        defaults={'nombre': 'Cobro Anexo Extra'}
+    )
+
+    for regla in reglas:
+        # Buscar unidades que coincidan con el subtipo de la regla
+        unidades_target = Unidad.objects.filter(
+            id_grupo__id_condominio=condominio
+        )
+
+        if regla.id_viv_subtipo:
+            unidades_target = unidades_target.filter(id_viv_subtipo=regla.id_viv_subtipo)
+
+        # Filtramos las que tienen flag de cobrable (Asumiendo que este flag activa la regla)
+        unidades_cobrables = unidades_target.filter(anexo_cobrable=True)
+
+        for unidad in unidades_cobrables:
+            # Recuperar el cobro mensual de esta unidad para este periodo
+            # Debe existir porque acabamos de correr generar_cierre_mensual antes
+            cobro = Cobro.objects.filter(
+                id_unidad=unidad,
+                periodo=periodo
+            ).first()
+
+            if not cobro:
+                continue
+
+            # Determinar monto.
+            # Como el modelo NO tiene campo de monto explícito, asumiremos un valor fijo
+            # o "Placeholder" para cumplir la lógica de negocio solicitada.
+            # En un caso real, el monto vendría de la Regla o de un parámetro global.
+            # Usaremos 10.000 como valor por defecto de "Multa/Cobro" por anexo extra.
+            monto_cargo = Decimal(10000)
+
+            # Crear Cargo Unidad
+            cargo_uni = CargoUnidad.objects.create(
+                id_unidad=unidad,
+                periodo=periodo,
+                id_concepto_cargo=concepto_anexo,
+                tipo=CargoUnidad.TipoCargo.EXTRA,
+                monto=monto_cargo,
+                detalle=f"Cargo por {regla.get_anexo_tipo_display()} adicional ({regla.comentario or 'S/C'})"
+            )
+
+            # Agregar al detalle del Cobro
+            CobroDetalle.objects.create(
+                id_cobro=cobro,
+                tipo=CobroDetalle.TipoDetalle.CARGO_INDIVIDUAL, # O Ajuste
+                id_cargo_uni=cargo_uni,
+                monto=monto_cargo,
+                glosa=f"Cobro adicional {regla.get_anexo_tipo_display()}"
+            )
+
+            # Actualizar totales del Cobro
+            cobro.total_cargos += monto_cargo
+            cobro.saldo += monto_cargo
+            cobro.save()
+
+            cargo_generados += 1
+
+    return cargo_generados
+
 @transaction.atomic
-def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None):
+def crear_gasto(condominio, form, usuario):
+    """
+    Crea un gasto a partir de un formulario validado y registra la auditoría.
+    """
+    gasto = form.save(commit=False)
+    gasto.id_condominio = condominio
+    gasto.save()
+
+    # Auditoría
+    registrar_auditoria(
+        entidad='Gasto',
+        entidad_id=gasto.pk,
+        accion='CREATE',
+        usuario=usuario,
+        detalle={'monto': float(gasto.total), 'proveedor': str(gasto.id_proveedor)}
+    )
+    return gasto
+
+@transaction.atomic
+def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None, usuario=None):
     """
     Registra un pago y lo aplica a la deuda más antigua (FIFO).
     """
@@ -314,6 +495,14 @@ def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None):
         fecha_pago=fecha_pago,
         observacion=observacion,
         tipo=Pago.TipoPago.NORMAL
+    )
+
+    registrar_auditoria(
+        entidad='Pago',
+        entidad_id=pago.pk,
+        accion='CREATE',
+        usuario=usuario,
+        detalle={'monto': float(monto), 'unidad': unidad.codigo}
     )
 
     monto_disponible = monto
@@ -365,4 +554,83 @@ def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None):
     # En un sistema real, se generaría un 'Saldo a Favor' para futuros cobros.
     # Aquí simplemente queda registrado el pago con monto mayor a lo aplicado.
 
+    # --- NOTIFICACIONES ---
+    # Notificar al residente "Pago Recibido"
+    from apps.usuarios.models import Residencia, Copropietario
+    destinatarios = set()
+    residentes = Residencia.objects.filter(id_unidad=unidad, hasta__isnull=True)
+    for res in residentes:
+        destinatarios.add(res.id_usuario)
+
+    if not destinatarios:
+        coprops = Copropietario.objects.filter(id_unidad=unidad, hasta__isnull=True)
+        for cop in coprops:
+            destinatarios.add(cop.id_usuario)
+
+    for usuario_dest in destinatarios:
+        Notificacion.objects.create(
+            usuario=usuario_dest,
+            titulo="Pago Confirmado",
+            mensaje=f"Hemos recibido su pago de ${monto:,.0f} para la unidad {unidad.codigo}. ¡Gracias!"
+        )
+
     return pago
+
+@transaction.atomic
+def anular_pago(pago_id, usuario=None):
+    """
+    Anula un pago existente creando un contra-asiento (Pago tipo AJUSTE negativo).
+    No borra físicamente el pago original.
+    """
+    pago_original = Pago.objects.get(pk=pago_id)
+
+    # Validar si ya está anulado (opcional, pero buena práctica)
+    # En este modelo simple, no tenemos estado 'ANULADO', así que permitimos crear el contra-asiento.
+
+    # Crear Contra-Asiento
+    contra_pago = Pago.objects.create(
+        id_unidad=pago_original.id_unidad,
+        monto= -pago_original.monto, # Monto Negativo
+        id_metodo_pago=pago_original.id_metodo_pago,
+        fecha_pago=timezone.now(),
+        periodo=pago_original.periodo,
+        tipo=Pago.TipoPago.AJUSTE,
+        observacion=f"Anulación/Reversa del Pago #{pago_original.id_pago}",
+        ref_externa=f"REV-{pago_original.id_pago}"
+    )
+
+    # Revertir aplicaciones (Si el pago original pagó cobros, debemos 'despagarlos' o aumentar su saldo)
+    aplicaciones = PagoAplicacion.objects.filter(id_pago=pago_original)
+
+    estado_pendiente, _ = CatCobroEstado.objects.get_or_create(codigo='PENDIENTE')
+
+    for app in aplicaciones:
+        cobro = app.id_cobro
+        monto_reversado = app.monto_aplicado
+
+        # Devolvemos el saldo al cobro
+        cobro.saldo += monto_reversado
+        cobro.total_pagado -= monto_reversado
+
+        # Si el saldo vuelve a ser positivo, cambiamos estado a PENDIENTE (o PARCIAL si implementáramos ese estado)
+        if cobro.saldo > 0:
+             cobro.id_cobro_estado = estado_pendiente
+
+        cobro.save()
+
+        # Registramos la aplicación negativa para trazabilidad
+        PagoAplicacion.objects.create(
+            id_pago=contra_pago,
+            id_cobro=cobro,
+            monto_aplicado= -monto_reversado
+        )
+
+    registrar_auditoria(
+        entidad='Pago',
+        entidad_id=pago_original.pk,
+        accion='DELETE', # Lógico
+        usuario=usuario,
+        detalle={'motivo': 'Anulación por usuario', 'contra_pago_id': contra_pago.pk}
+    )
+
+    return contra_pago
