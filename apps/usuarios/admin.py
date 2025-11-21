@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 # Importamos nuestros modelos personalizados
 from .models import (
     Usuario, UsuarioAdminCondo, 
-    Copropietario, Residencia  # <-- ¡NUEVOS!
+    Copropietario, Residencia, CodigoVerificacion  # <-- ¡NUEVOS!
 )
 
 # --- INICIO: Configuración del Admin para Usuario ---
@@ -99,5 +99,11 @@ class ResidenciaAdmin(admin.ModelAdmin):
     # Usamos 'raw_id_fields' porque pueden haber miles de usuarios y unidades
     raw_id_fields = ('id_usuario', 'id_unidad')
     ordering = ('-desde',)
+
+@admin.register(CodigoVerificacion)
+class CodigoVerificacionAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'accion', 'codigo', 'creado_at')
+    search_fields = ('usuario__email', 'codigo', 'accion')
+    raw_id_fields = ('usuario',)
 
 # --- FIN: Admin para Relación Usuario-Unidad ---

@@ -10,33 +10,57 @@
     </div>
 </div>
 
-<div class="row g-2 mb-4 row-cols-3 row-cols-md-3">
-    <div class="col">
-        <a href="#" class="card bg-white border shadow-sm h-100 text-decoration-none">
-            <div class="card-body text-center p-2 p-md-3">
-                <i class="fa-solid fa-user-gear fa-2x text-primary mb-2"></i>
-                <h6 class="card-title text-dark small mb-0">Mi Perfil</h6>
-                <small class="text-muted d-none d-md-block">Gestionar datos</small>
+<!-- Quick Actions Cards -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h5 class="mb-3">Accesos Rápidos</h5>
+        <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <div class="card h-100 border-start border-4 border-info shadow-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="bg-light p-3 rounded-circle me-3 text-info">
+                            <i class="fa-solid fa-user-pen fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-title mb-1">Mi Perfil</h6>
+                            <a href="{% url 'user_profile' %}" class="stretched-link text-decoration-none text-muted small">
+                                Editar datos y seguridad
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </a>
-    </div>
-    <div class="col">
-        <a href="#" class="card bg-white border shadow-sm h-100 text-decoration-none">
-            <div class="card-body text-center p-2 p-md-3">
-                <i class="fa-solid fa-circle-question fa-2x text-info mb-2"></i>
-                <h6 class="card-title text-dark small mb-0">Ayuda</h6>
-                <small class="text-muted d-none d-md-block">Soporte técnico</small>
+            <div class="col-12 col-md-4">
+                <div class="card h-100 border-start border-4 border-warning shadow-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="bg-light p-3 rounded-circle me-3 text-warning">
+                            <i class="fa-solid fa-bell fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-title mb-1">Avisos</h6>
+                            <a href="{% url 'avisos_list' %}" class="stretched-link text-decoration-none text-muted small">
+                                Ver notificaciones
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </a>
-    </div>
-    <div class="col">
-        <a href="#" class="card bg-white border shadow-sm h-100 text-decoration-none">
-            <div class="card-body text-center p-2 p-md-3">
-                <i class="fa-solid fa-bell fa-2x text-warning mb-2"></i>
-                <h6 class="card-title text-dark small mb-0">Avisos</h6>
-                <small class="text-muted d-none d-md-block">Novedades</small>
+            <div class="col-12 col-md-4">
+                <div class="card h-100 border-start border-4 border-success shadow-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="bg-light p-3 rounded-circle me-3 text-success">
+                            <i class="fa-solid fa-headset fa-2x"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-title mb-1">Ayuda / Soporte</h6>
+                            <a href="{% url 'soporte' %}" class="stretched-link text-decoration-none text-muted small">
+                                Contactar soporte
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </a>
+        </div>
     </div>
 </div>
 

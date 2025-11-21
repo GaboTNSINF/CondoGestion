@@ -8,7 +8,8 @@ from .models import (
     CatDocTipo, Proveedor,
     GastoCategoria, Gasto,
     # --- NUEVOS MODELOS FALTANTES ---
-    ParamReglamento, FondoReservaMov, InteresRegla, Auditoria, CondominioAnexoRegla
+    ParamReglamento, FondoReservaMov, InteresRegla, Auditoria, CondominioAnexoRegla,
+    Notificacion, CuentaContable, LibroMovimiento, ResumenMensual
 )
 
 # --- INICIO: Admin para Catálogos de Unidad ---
@@ -283,5 +284,29 @@ class AuditoriaAdmin(admin.ModelAdmin):
         return False
     def has_delete_permission(self, request, obj=None):
         return False
+
+@admin.register(Notificacion)
+class NotificacionAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'titulo', 'leido', 'created_at')
+    list_filter = ('leido', 'created_at')
+    search_fields = ('usuario__email', 'titulo', 'mensaje')
+    raw_id_fields = ('usuario',)
+
+@admin.register(CuentaContable)
+class CuentaContableAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+@admin.register(LibroMovimiento)
+class LibroMovimientoAdmin(admin.ModelAdmin):
+    list_display = ('id_condominio', 'fecha', 'id_cta_contable', 'debe', 'haber')
+    list_filter = ('id_condominio', 'id_cta_contable', 'fecha')
+    raw_id_fields = ('id_condominio', 'id_cta_contable')
+
+@admin.register(ResumenMensual)
+class ResumenMensualAdmin(admin.ModelAdmin):
+    list_display = ('id_condominio', 'periodo', 'total_pagado', 'saldo_por_cobrar', 'generado_at')
+    list_filter = ('id_condominio', 'periodo')
+    raw_id_fields = ('id_condominio',)
 
 # --- FIN: Admin Faltantes Críticos ---
