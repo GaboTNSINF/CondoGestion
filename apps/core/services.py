@@ -487,6 +487,9 @@ def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None, usu
     """
     Registra un pago y lo aplica a la deuda más antigua (FIFO).
     """
+    if monto <= 0:
+        raise ValueError("El monto del pago debe ser positivo.")
+
     # 1. Crear el registro de Pago
     pago = Pago.objects.create(
         id_unidad=unidad,
