@@ -19,10 +19,36 @@ def perfil_update_view(request):
             password_form = PasswordChangeForm(request.user, request.POST)
             profile_form = UserProfileForm(instance=request.user)
             if password_form.is_valid():
-                user = password_form.save()
-                update_session_auth_hash(request, user)  # Important!
-                messages.success(request, 'Contraseña actualizada exitosamente.')
-                return redirect('user_profile')
+                # 2FA Logic for Password
+
+                # Store pending password in session
+                request.session['pending_password_update'] = password_form.cleaned_data['new_password1']
+
+                # Generate OTP
+                otp = get_random_string(length=6, allowed_chars='0123456789')
+
+                # Save OTP
+                CodigoVerificacion.objects.create(
+                    usuario=request.user,
+                    codigo=otp,
+                    accion='password_update'
+                )
+
+                # Send Email
+                print(f"*** 2FA CODE FOR PASSWORD CHANGE {request.user.email}: {otp} ***")
+                try:
+                    send_mail(
+                        'Código de Verificación - Cambio de Contraseña',
+                        f'Tu código es: {otp}. Expira en 10 minutos.',
+                        settings.DEFAULT_FROM_EMAIL or 'noreply@condogestion.cl',
+                        [request.user.email],
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+
+                messages.info(request, f'Se ha enviado un código de verificación a {request.user.email}.')
+                return redirect('verify_otp')
             else:
                 messages.error(request, 'Error al cambiar la contraseña.')
         else:
@@ -31,19 +57,10 @@ def perfil_update_view(request):
             password_form = PasswordChangeForm(request.user)
 
             if profile_form.is_valid():
-                # 2FA Logic: Don't save yet
-                # Check if any critical field changed
-                changed_data = profile_form.cleaned_data
-                if (changed_data['email'] != request.user.email or
-                    changed_data['nombres'] != request.user.nombres or
-                    changed_data['apellidos'] != request.user.apellidos):
-
+                # Use has_changed() correctly
+                if profile_form.has_changed():
                     # Save pending data to session
-                    request.session['pending_profile_update'] = {
-                        'nombres': changed_data['nombres'],
-                        'apellidos': changed_data['apellidos'],
-                        'email': changed_data['email']
-                    }
+                    request.session['pending_profile_update'] = profile_form.cleaned_data
 
                     # Generate OTP
                     otp = get_random_string(length=6, allowed_chars='0123456789')
@@ -55,12 +72,11 @@ def perfil_update_view(request):
                         accion='perfil_update'
                     )
 
-                    # Send Email (Mock in dev usually, but using send_mail)
-                    # In production this needs a backend. In dev console backend is default.
-                    print(f"*** 2FA CODE FOR {request.user.email}: {otp} ***") # For debugging/demo
+                    # Send Email
+                    print(f"*** 2FA CODE FOR PROFILE UPDATE {request.user.email}: {otp} ***")
                     try:
                         send_mail(
-                            'Código de Verificación - CondoGestión',
+                            'Código de Verificación - Actualización Perfil',
                             f'Tu código es: {otp}. Expira en 10 minutos.',
                             settings.DEFAULT_FROM_EMAIL or 'noreply@condogestion.cl',
                             [request.user.email],
@@ -84,7 +100,10 @@ def perfil_update_view(request):
 
 @login_required
 def verify_otp_view(request):
-    if 'pending_profile_update' not in request.session:
+    pending_profile = request.session.get('pending_profile_update')
+    pending_password = request.session.get('pending_password_update')
+
+    if not pending_profile and not pending_password:
         messages.warning(request, 'No hay cambios pendientes de verificación.')
         return redirect('user_profile')
 
@@ -94,30 +113,51 @@ def verify_otp_view(request):
             code = form.cleaned_data['codigo']
 
             # Verify code
-            # Get latest code for this action
-            verification = CodigoVerificacion.objects.filter(
-                usuario=request.user,
-                accion='perfil_update',
-                codigo=code
-            ).order_by('-creado_at').first()
+            # Check for password update first (priority or just logic)
+            if pending_password:
+                verification = CodigoVerificacion.objects.filter(
+                    usuario=request.user,
+                    accion='password_update',
+                    codigo=code
+                ).order_by('-creado_at').first()
 
-            if verification and verification.es_valido():
-                # Apply changes
-                data = request.session['pending_profile_update']
-                user = request.user
-                user.nombres = data['nombres']
-                user.apellidos = data['apellidos']
-                user.email = data['email']
-                user.save()
+                if verification and verification.es_valido():
+                    user = request.user
+                    user.set_password(pending_password)
+                    user.save()
+                    update_session_auth_hash(request, user) # Keep logged in
 
-                # Clean up
-                del request.session['pending_profile_update']
-                verification.delete() # Optional: prevent reuse
+                    # Clean up
+                    del request.session['pending_password_update']
+                    verification.delete()
 
-                messages.success(request, 'Perfil actualizado exitosamente.')
-                return redirect('user_profile')
-            else:
-                messages.error(request, 'Código inválido o expirado.')
+                    messages.success(request, 'Contraseña actualizada exitosamente.')
+                    return redirect('user_profile')
+
+            # Check profile update
+            if pending_profile:
+                verification = CodigoVerificacion.objects.filter(
+                    usuario=request.user,
+                    accion='perfil_update',
+                    codigo=code
+                ).order_by('-creado_at').first()
+
+                if verification and verification.es_valido():
+                    data = pending_profile
+                    user = request.user
+                    user.nombres = data.get('nombres', user.nombres)
+                    user.apellidos = data.get('apellidos', user.apellidos)
+                    user.email = data.get('email', user.email)
+                    user.save()
+
+                    # Clean up
+                    del request.session['pending_profile_update']
+                    verification.delete()
+
+                    messages.success(request, 'Perfil actualizado exitosamente.')
+                    return redirect('user_profile')
+
+            messages.error(request, 'Código inválido o expirado.')
     else:
         form = OTPVerificationForm()
 
