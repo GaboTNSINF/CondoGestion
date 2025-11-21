@@ -1109,3 +1109,68 @@ class InteresRegla(models.Model):
         indexes = [
             models.Index(fields=['id_condominio', 'id_segmento', 'vigente_desde', 'vigente_hasta'], name='ix_ir_rango'),
         ]
+
+# --- INICIO: Modelos de Fondo de Reserva y Reglamento ---
+
+class ParamReglamento(models.Model):
+    """
+    [MAPEO: Tabla 'param_reglamento']
+    Parámetros globales del reglamento de copropiedad del condominio.
+    """
+    id_condominio = models.OneToOneField(
+        Condominio,
+        on_delete=models.RESTRICT,
+        primary_key=True,
+        db_column='id_condominio'
+    )
+    recargo_fondo_reserva_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, default=5.00,
+        verbose_name="Recargo Fondo Reserva %"
+    )
+    interes_mora_anual_pct = models.DecimalField(
+        max_digits=6, decimal_places=3, null=True, blank=True
+    )
+    dias_gracia = models.PositiveSmallIntegerField(default=0)
+    multa_morosidad_fija = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
+
+    def __str__(self):
+        return f"Reglamento de {self.id_condominio}"
+
+    class Meta:
+        db_table = 'param_reglamento'
+        verbose_name = 'Parámetros de Reglamento'
+        verbose_name_plural = 'Parámetros de Reglamentos'
+
+
+class FondoReservaMov(models.Model):
+    """
+    [MAPEO: Tabla 'fondo_reserva_mov']
+    Movimientos del Fondo de Reserva (Abonos, Cargos/Usos).
+    """
+    id_fondo_reserva = models.AutoField(primary_key=True)
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.RESTRICT,
+        db_column='id_condominio'
+    )
+    fecha = models.DateTimeField()
+
+    # Tipo no está restringido en SQL a enum estricto, pero usaremos constantes
+    tipo = models.CharField(max_length=10) # 'ABONO', 'CARGO'
+
+    periodo = models.CharField(max_length=6, null=True, blank=True)
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    glosa = models.CharField(max_length=300, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.tipo} ${self.monto} ({self.fecha.date()})"
+
+    class Meta:
+        db_table = 'fondo_reserva_mov'
+        verbose_name = 'Movimiento Fondo Reserva'
+        verbose_name_plural = 'Movimientos Fondo Reserva'
+        indexes = [
+            models.Index(fields=['id_condominio', 'fecha'], name='ix_fr'),
+        ]

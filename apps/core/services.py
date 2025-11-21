@@ -5,7 +5,7 @@ from django.utils import timezone
 from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
     Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
-    CatMetodoPago, InteresRegla
+    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov
 )
 
 def calcular_factores_prorrateo(prorrateo_regla: ProrrateoRegla):
@@ -153,29 +153,74 @@ def calcular_intereses_mora(cobro_actual: Cobro, periodo_actual: str):
 
     # Actualizar total de intereses en la cabecera
     cobro_actual.total_interes = monto_interes
-    # Importante: No guardar cobro_actual aquí si luego vamos a sumar todo,
-    # pero es seguro actualizar el campo.
 
     return monto_interes
+
+def aplicar_fondo_reserva(condominio, total_gastos, periodo):
+    """
+    Calcula el recargo por fondo de reserva y registra el movimiento.
+    Retorna el monto del recargo.
+    """
+    # 1. Obtener porcentaje del Reglamento
+    # Si no existe param, usamos 5% por defecto
+    try:
+        param = ParamReglamento.objects.get(id_condominio=condominio)
+        porcentaje = param.recargo_fondo_reserva_pct
+    except ParamReglamento.DoesNotExist:
+        # Crear con default 5%
+        param = ParamReglamento.objects.create(id_condominio=condominio)
+        porcentaje = param.recargo_fondo_reserva_pct
+
+    if porcentaje <= 0:
+        return Decimal(0)
+
+    # 2. Calcular Monto
+    monto_fondo = total_gastos * (porcentaje / Decimal(100))
+    monto_fondo = round(monto_fondo, 0) # Redondeo a entero
+
+    if monto_fondo <= 0:
+        return Decimal(0)
+
+    # 3. Registrar Movimiento de Abono al Fondo (Provisionado)
+    # Usamos 'ABONO' porque es dinero que ENTRA al fondo (aunque sale del bolsillo del copropietario)
+    # Revisar si ya existe para el periodo para evitar duplicados
+    FondoReservaMov.objects.update_or_create(
+        id_condominio=condominio,
+        periodo=periodo,
+        tipo='ABONO',
+        defaults={
+            'fecha': timezone.now(),
+            'monto': monto_fondo,
+            'glosa': f"Recargo {porcentaje}% Fondo Reserva sobre gastos de {periodo}"
+        }
+    )
+
+    return monto_fondo
 
 @transaction.atomic
 def generar_cierre_mensual(condominio, periodo):
     """
     Genera los cobros mensuales (Gastos Comunes) para un periodo dado.
     1. Suma todos los gastos del periodo.
-    2. Obtiene la regla de prorrateo (Gasto Común) vigente.
-    3. Distribuye el total de gastos entre las unidades.
+    2. Calcula Fondo de Reserva y lo suma al total a prorratear.
+    3. Distribuye el total (Gastos + FR) entre las unidades.
     4. Crea los registros de Cobro y CobroDetalle.
     5. Calcula intereses por mora sobre deudas anteriores.
     """
 
     # 1. Sumar gastos del periodo
-    total_gastos = Gasto.objects.filter(
+    total_gastos_operacionales = Gasto.objects.filter(
         id_condominio=condominio,
         periodo=periodo
     ).aggregate(Sum('total'))['total__sum'] or Decimal(0)
 
-    # 2. Obtener regla de prorrateo vigente
+    # 2. Calcular Fondo de Reserva
+    monto_fondo_reserva = aplicar_fondo_reserva(condominio, total_gastos_operacionales, periodo)
+
+    # TOTAL A PRORRATEAR = Gastos + Fondo Reserva
+    total_a_prorratear = total_gastos_operacionales + monto_fondo_reserva
+
+    # 3. Obtener regla de prorrateo vigente
     regla_prorrateo = ProrrateoRegla.objects.filter(
         id_condominio=condominio,
         tipo=ProrrateoRegla.TipoProrrateo.ORDINARIO
@@ -193,12 +238,12 @@ def generar_cierre_mensual(condominio, periodo):
 
     cobros_generados = []
 
-    # 3. Iterar por cada unidad y generar su cobro base
+    # 4. Iterar por cada unidad y generar su cobro base
     for factor_obj in factores:
         unidad = factor_obj.id_unidad
         factor = factor_obj.factor
 
-        monto_prorrateado = round(total_gastos * factor, 0)
+        monto_prorrateado = round(total_a_prorratear * factor, 0)
 
         # Crear/Actualizar Cabecera
         cobro, created = Cobro.objects.update_or_create(
@@ -208,21 +253,25 @@ def generar_cierre_mensual(condominio, periodo):
             defaults={
                 'id_cobro_estado': estado_pendiente,
                 'id_prorrateo': regla_prorrateo,
-                # Inicializamos valores, luego sumamos
                 'total_cargos': monto_prorrateado,
-                'saldo': 0, # Se recalcula al final
+                'saldo': 0,
                 'observacion': f"Cierre Mensual {periodo}"
             }
         )
 
-        # Detalle Gasto Común
+        # Detalle Gasto Común (Incluye FR implícito en el prorrateo general)
+        # Nota: Idealmente desglosaríamos en el detalle "Gasto Op" y "Fondo Reserva",
+        # pero para simplificar el MVP, prorrateamos el total.
+        # Si se requiere desglose, habría que crear dos CargoUnidad por persona.
+        # Vamos a dejarlo como un solo cargo "Gasto Común" que incluye todo.
+
         cargo_uni, _ = CargoUnidad.objects.update_or_create(
             id_unidad=unidad,
             periodo=periodo,
             id_concepto_cargo=regla_prorrateo.id_concepto_cargo,
             defaults={
                 'monto': monto_prorrateado,
-                'detalle': f"Gasto Común Prorrateado (Factor: {factor:.6f})"
+                'detalle': f"Gasto Común (Inc. Fondo Reserva) - Factor: {factor:.6f}"
             }
         )
 
@@ -236,19 +285,15 @@ def generar_cierre_mensual(condominio, periodo):
             }
         )
 
-        # --- NUEVO: Calcular Intereses por Mora ---
+        # 5. Calcular Intereses por Mora
         interes = calcular_intereses_mora(cobro, periodo)
 
         # Recalcular Totales Finales del Cobro
-        # Total Cargos = GC + Otros Cargos (que no tenemos aun)
-        # Total Cobro = Total Cargos + Intereses - Descuentos
-
         cobro.total_cargos = monto_prorrateado
         cobro.total_interes = interes
 
         total_a_pagar = cobro.total_cargos + cobro.total_interes - cobro.total_descuentos
 
-        # El saldo inicial es el total a pagar (asumiendo 0 pagado en este cobro nuevo)
         cobro.saldo = total_a_pagar - cobro.total_pagado
 
         cobro.save()
