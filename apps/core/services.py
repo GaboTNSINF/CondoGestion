@@ -5,8 +5,26 @@ from django.utils import timezone
 from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
     Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
-    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov
+    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov, Auditoria
 )
+
+def registrar_auditoria(entidad, entidad_id, accion, usuario, detalle=None):
+    """
+    Registra una acción en la tabla de auditoría.
+    """
+    try:
+        Auditoria.objects.create(
+            entidad=entidad,
+            entidad_id=entidad_id,
+            accion=accion,
+            id_usuario=usuario if usuario and usuario.is_authenticated else None,
+            usuario_email=usuario.email if usuario and usuario.is_authenticated else 'sistema',
+            detalle=detalle
+        )
+    except Exception as e:
+        # En producción, usar logging.error. No queremos romper la transacción principal si falla la auditoría
+        # pero en "Security Zero Trust" quizás sí. Para este MVP, lo dejamos silencioso o print.
+        print(f"Error auditando: {e}")
 
 def calcular_factores_prorrateo(prorrateo_regla: ProrrateoRegla):
     """
@@ -238,6 +256,9 @@ def generar_cierre_mensual(condominio, periodo):
 
     cobros_generados = []
 
+    # TODO: Recuperar usuario actual del request si fuera posible, pero en services es difícil sin pasar contexto.
+    # Asumiremos 'None' (Sistema) o pasaremos el usuario como argumento en refactor futuro.
+
     # 4. Iterar por cada unidad y generar su cobro base
     for factor_obj in factores:
         unidad = factor_obj.id_unidad
@@ -299,10 +320,19 @@ def generar_cierre_mensual(condominio, periodo):
         cobro.save()
         cobros_generados.append(cobro)
 
+    # Auditoría masiva (simplificada)
+    registrar_auditoria(
+        entidad='Cobro',
+        entidad_id=0, # 0 indicando masivo
+        accion='CREATE',
+        usuario=None,
+        detalle={'periodo': periodo, 'cantidad_generada': len(cobros_generados)}
+    )
+
     return cobros_generados
 
 @transaction.atomic
-def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None):
+def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None, usuario=None):
     """
     Registra un pago y lo aplica a la deuda más antigua (FIFO).
     """
@@ -314,6 +344,14 @@ def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None):
         fecha_pago=fecha_pago,
         observacion=observacion,
         tipo=Pago.TipoPago.NORMAL
+    )
+
+    registrar_auditoria(
+        entidad='Pago',
+        entidad_id=pago.pk,
+        accion='CREATE',
+        usuario=usuario,
+        detalle={'monto': float(monto), 'unidad': unidad.codigo}
     )
 
     monto_disponible = monto
@@ -366,3 +404,62 @@ def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None):
     # Aquí simplemente queda registrado el pago con monto mayor a lo aplicado.
 
     return pago
+
+@transaction.atomic
+def anular_pago(pago_id, usuario=None):
+    """
+    Anula un pago existente creando un contra-asiento (Pago tipo AJUSTE negativo).
+    No borra físicamente el pago original.
+    """
+    pago_original = Pago.objects.get(pk=pago_id)
+
+    # Validar si ya está anulado (opcional, pero buena práctica)
+    # En este modelo simple, no tenemos estado 'ANULADO', así que permitimos crear el contra-asiento.
+
+    # Crear Contra-Asiento
+    contra_pago = Pago.objects.create(
+        id_unidad=pago_original.id_unidad,
+        monto= -pago_original.monto, # Monto Negativo
+        id_metodo_pago=pago_original.id_metodo_pago,
+        fecha_pago=timezone.now(),
+        periodo=pago_original.periodo,
+        tipo=Pago.TipoPago.AJUSTE,
+        observacion=f"Anulación/Reversa del Pago #{pago_original.id_pago}",
+        ref_externa=f"REV-{pago_original.id_pago}"
+    )
+
+    # Revertir aplicaciones (Si el pago original pagó cobros, debemos 'despagarlos' o aumentar su saldo)
+    aplicaciones = PagoAplicacion.objects.filter(id_pago=pago_original)
+
+    estado_pendiente, _ = CatCobroEstado.objects.get_or_create(codigo='PENDIENTE')
+
+    for app in aplicaciones:
+        cobro = app.id_cobro
+        monto_reversado = app.monto_aplicado
+
+        # Devolvemos el saldo al cobro
+        cobro.saldo += monto_reversado
+        cobro.total_pagado -= monto_reversado
+
+        # Si el saldo vuelve a ser positivo, cambiamos estado a PENDIENTE (o PARCIAL si implementáramos ese estado)
+        if cobro.saldo > 0:
+             cobro.id_cobro_estado = estado_pendiente
+
+        cobro.save()
+
+        # Registramos la aplicación negativa para trazabilidad
+        PagoAplicacion.objects.create(
+            id_pago=contra_pago,
+            id_cobro=cobro,
+            monto_aplicado= -monto_reversado
+        )
+
+    registrar_auditoria(
+        entidad='Pago',
+        entidad_id=pago_original.pk,
+        accion='DELETE', # Lógico
+        usuario=usuario,
+        detalle={'motivo': 'Anulación por usuario', 'contra_pago_id': contra_pago.pk}
+    )
+
+    return contra_pago

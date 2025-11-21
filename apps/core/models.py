@@ -1245,3 +1245,76 @@ class CondominioAnexoRegla(models.Model):
         indexes = [
             models.Index(fields=['id_condominio', 'id_viv_subtipo', 'anexo_tipo', 'vigente_desde', 'vigente_hasta'], name='ix_car_rango'),
         ]
+
+class CuentaContable(models.Model):
+    """
+    [MAPEO: Tabla 'cuenta_contable']
+    Catálogo de cuentas contables para el condominio.
+    """
+    id_cta_contable = models.AutoField(primary_key=True)
+    codigo = models.CharField(max_length=40, unique=True)
+    nombre = models.CharField(max_length=80)
+
+    def __str__(self):
+        return f"{self.codigo} - {self.nombre}"
+
+    class Meta:
+        db_table = 'cuenta_contable'
+        verbose_name = 'Cuenta Contable'
+        verbose_name_plural = 'Cuentas Contables'
+
+class LibroMovimiento(models.Model):
+    """
+    [MAPEO: Tabla 'libro_movimiento']
+    Registro de movimientos contables (Debe/Haber).
+    """
+    id_libro_mov = models.AutoField(primary_key=True)
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.RESTRICT,
+        db_column='id_condominio'
+    )
+    fecha = models.DateTimeField()
+    id_cta_contable = models.ForeignKey(
+        CuentaContable,
+        on_delete=models.RESTRICT,
+        db_column='id_cta_contable'
+    )
+    debe = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    haber = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    ref_tabla = models.CharField(max_length=40, null=True, blank=True)
+    ref_id = models.BigIntegerField(null=True, blank=True)
+    glosa = models.CharField(max_length=300, null=True, blank=True)
+
+    class Meta:
+        db_table = 'libro_movimiento'
+        indexes = [
+            models.Index(fields=['id_condominio', 'fecha', 'id_cta_contable'], name='ix_mayor'),
+        ]
+
+class ResumenMensual(models.Model):
+    """
+    [MAPEO: Tabla 'resumen_mensual']
+    Snapshot o foto del estado financiero de un mes cerrado.
+    """
+    id_resumen = models.AutoField(primary_key=True)
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.RESTRICT,
+        db_column='id_condominio'
+    )
+    periodo = models.CharField(max_length=6)
+
+    total_gastos = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_cargos = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_interes = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_descuentos = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total_pagado = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    saldo_por_cobrar = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    generado_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'resumen_mensual'
+        unique_together = ('id_condominio', 'periodo')
