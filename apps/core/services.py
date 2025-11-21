@@ -6,8 +6,47 @@ from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
     Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
     CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov, Auditoria, CondominioAnexoRegla,
-    Notificacion
+    Notificacion, ResumenMensual
 )
+
+def get_proximo_periodo(condominio):
+    """
+    Determina el próximo periodo a cerrar (YYYYMM).
+    Busca el último Cobro o ResumenMensual.
+    Si existe: ultimo + 1 mes.
+    Si no: Mes actual.
+    """
+    # Check last ResumenMensual (Closed month)
+    last_resumen = ResumenMensual.objects.filter(id_condominio=condominio).order_by('-periodo').first()
+    last_cobro = Cobro.objects.filter(id_unidad__id_grupo__id_condominio=condominio).order_by('-periodo').first()
+
+    last_period = None
+    if last_resumen:
+        last_period = last_resumen.periodo
+
+    if last_cobro:
+        if not last_period or last_cobro.periodo > last_period:
+            last_period = last_cobro.periodo
+
+    if not last_period:
+        # No history, use current month
+        return timezone.now().strftime("%Y%m")
+
+    # Calculate next month
+    # Format YYYYMM
+    try:
+        year = int(last_period[:4])
+        month = int(last_period[4:])
+
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+
+        return f"{year}{month:02d}"
+    except (ValueError, IndexError):
+        # Fallback
+        return timezone.now().strftime("%Y%m")
 
 def registrar_auditoria(entidad, entidad_id, accion, usuario, detalle=None):
     """
@@ -194,7 +233,7 @@ def aplicar_fondo_reserva(condominio, total_gastos, periodo):
         return Decimal(0)
 
     # 2. Calcular Monto
-    monto_fondo = total_gastos * (porcentaje / Decimal(100))
+    monto_fondo = total_gastos * (Decimal(porcentaje) / Decimal(100))
     monto_fondo = round(monto_fondo, 0) # Redondeo a entero
 
     if monto_fondo <= 0:
@@ -467,9 +506,15 @@ def calcular_cobro_anexos(condominio, periodo):
 def crear_gasto(condominio, form, usuario):
     """
     Crea un gasto a partir de un formulario validado y registra la auditoría.
+    Auto-calcula el periodo basado en la fecha de emisión si no viene en el form.
     """
     gasto = form.save(commit=False)
     gasto.id_condominio = condominio
+
+    # Auto-calculate period if not present or empty
+    if not gasto.periodo and gasto.fecha_emision:
+        gasto.periodo = gasto.fecha_emision.strftime("%Y%m")
+
     gasto.save()
 
     # Auditoría
@@ -487,12 +532,21 @@ def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None, usu
     """
     Registra un pago y lo aplica a la deuda más antigua (FIFO).
     """
+    # Calculate period from fecha_pago
+    periodo = None
+    if hasattr(fecha_pago, 'strftime'):
+        periodo = fecha_pago.strftime("%Y%m")
+    elif isinstance(fecha_pago, str):
+        # Attempt to parse if string (though view passes date object usually)
+        pass
+
     # 1. Crear el registro de Pago
     pago = Pago.objects.create(
         id_unidad=unidad,
         monto=monto,
         id_metodo_pago=metodo_pago,
         fecha_pago=fecha_pago,
+        periodo=periodo,
         observacion=observacion,
         tipo=Pago.TipoPago.NORMAL
     )

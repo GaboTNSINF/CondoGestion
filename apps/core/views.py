@@ -12,7 +12,10 @@ from .models import (
     Notificacion, Auditoria, CondominioAnexoRegla, ParamReglamento
 )
 from .forms import GastoForm, PagoForm, TrabajadorForm, RemuneracionForm
-from .services import generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto
+from .services import (
+    generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto,
+    get_proximo_periodo
+)
 
 # --- INICIO: Vistas del Dashboard ---
 
@@ -115,10 +118,11 @@ def cierre_mensual_view(request, condominio_id):
     condominio = get_object_or_404(Condominio, pk=condominio_id)
 
     # Periodo por defecto: mes actual o último con movimientos
-    # Por simplicidad para el MVP, usaremos un parámetro GET o un hardcode temporal,
-    # o idealmente un selector de fechas.
-    # Vamos a tomar el parametro 'periodo' del GET, o '202311' como ejemplo.
-    periodo = request.GET.get('periodo', '202311') # TODO: Calcular dinámicamente
+    # Calculado dinámicamente
+    periodo_sugerido = get_proximo_periodo(condominio)
+
+    # Permitimos override por GET (opcional, por si acaso)
+    periodo = request.GET.get('periodo', periodo_sugerido)
 
     # Resumen de gastos
     total_gastos = Gasto.objects.filter(
