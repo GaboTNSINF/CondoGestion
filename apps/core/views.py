@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.contrib import messages
 from django.db.models import Sum
+from django.utils import timezone  # <--- 1. AGREGAMOS ESTO PARA SABER LA FECHA
 
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
 from .models import Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion
@@ -93,11 +94,13 @@ def cierre_mensual_view(request, condominio_id):
     """
     condominio = get_object_or_404(Condominio, pk=condominio_id)
 
-    # Periodo por defecto: mes actual o último con movimientos
-    # Por simplicidad para el MVP, usaremos un parámetro GET o un hardcode temporal,
-    # o idealmente un selector de fechas.
-    # Vamos a tomar el parametro 'periodo' del GET, o '202311' como ejemplo.
-    periodo = request.GET.get('periodo', '202311') # TODO: Calcular dinámicamente
+    # --- 2. LÓGICA AUTOMÁTICA DE FECHA ---
+    # Calculamos el periodo actual (AñoMes, ej: 202511) usando la fecha de hoy.
+    periodo_actual = timezone.now().strftime('%Y%m')
+    
+    # Si el usuario no especifica un periodo en la URL (?periodo=...), 
+    # usamos el periodo actual calculado automáticamente.
+    periodo = request.GET.get('periodo', periodo_actual) 
 
     # Resumen de gastos
     total_gastos = Gasto.objects.filter(
