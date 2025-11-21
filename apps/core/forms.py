@@ -18,17 +18,17 @@ class GastoForm(forms.ModelForm):
             'evidencia_url'
         ]
         widgets = {
-            'fecha_emision': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'fecha_venc': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'periodo': forms.TextInput(attrs={'placeholder': 'YYYYMM', 'class': 'form-control'}),
-            'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-            'neto': forms.NumberInput(attrs={'class': 'form-control'}),
-            'iva': forms.NumberInput(attrs={'class': 'form-control'}),
-            'documento_folio': forms.TextInput(attrs={'class': 'form-control'}),
-            'evidencia_url': forms.URLInput(attrs={'class': 'form-control'}),
-            'id_gasto_categ': forms.Select(attrs={'class': 'form-control'}),
-            'id_proveedor': forms.Select(attrs={'class': 'form-control'}),
-            'id_doc_tipo': forms.Select(attrs={'class': 'form-control'}),
+            'fecha_emision': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
+            'fecha_venc': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
+            'periodo': forms.TextInput(attrs={'placeholder': 'YYYYMM', 'class': 'form-control form-control-lg'}),
+            'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control form-control-lg'}),
+            'neto': forms.NumberInput(attrs={'class': 'form-control form-control-lg'}),
+            'iva': forms.NumberInput(attrs={'class': 'form-control form-control-lg'}),
+            'documento_folio': forms.TextInput(attrs={'class': 'form-control form-control-lg'}),
+            'evidencia_url': forms.URLInput(attrs={'class': 'form-control form-control-lg'}),
+            'id_gasto_categ': forms.Select(attrs={'class': 'form-control form-control-lg'}),
+            'id_proveedor': forms.Select(attrs={'class': 'form-control form-control-lg'}),
+            'id_doc_tipo': forms.Select(attrs={'class': 'form-control form-control-lg'}),
         }
         labels = {
             'id_gasto_categ': 'Categoría',
@@ -43,11 +43,11 @@ class PagoForm(forms.ModelForm):
         model = Pago
         fields = ['id_unidad', 'monto', 'id_metodo_pago', 'fecha_pago', 'observacion']
         widgets = {
-            'id_unidad': forms.Select(attrs={'class': 'form-control'}),
-            'monto': forms.NumberInput(attrs={'class': 'form-control'}),
-            'id_metodo_pago': forms.Select(attrs={'class': 'form-control'}),
-            'fecha_pago': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'observacion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+            'id_unidad': forms.Select(attrs={'class': 'form-control form-control-lg'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control form-control-lg'}),
+            'id_metodo_pago': forms.Select(attrs={'class': 'form-control form-control-lg'}),
+            'fecha_pago': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
+            'observacion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control form-control-lg'}),
         }
         labels = {
             'id_unidad': 'Unidad',
