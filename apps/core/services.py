@@ -5,7 +5,8 @@ from django.utils import timezone
 from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
     Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
-    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov, Auditoria, CondominioAnexoRegla
+    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov, Auditoria, CondominioAnexoRegla,
+    Notificacion
 )
 
 def registrar_auditoria(entidad, entidad_id, accion, usuario, detalle=None):
@@ -332,6 +333,49 @@ def generar_cierre_mensual(condominio, periodo):
         detalle={'periodo': periodo, 'cantidad_generada': len(cobros_generados)}
     )
 
+    # --- NOTIFICACIONES ---
+    # 1. Notificar Administradores
+    # Buscar usuarios admin de este condominio (Modelo UsuarioAdminCondo no importado, pero podemos navegar)
+    # Ojo: UsuarioAdminCondo esta en usuarios.models y no podemos importarlo circularmente facil.
+    # Usaremos un filtro genérico si es posible o importamos dentro de la función.
+    from apps.usuarios.models import UsuarioAdminCondo, Copropietario, Residencia
+
+    admins = UsuarioAdminCondo.objects.filter(id_condominio=condominio).select_related('id_usuario')
+    for admin_rel in admins:
+        Notificacion.objects.create(
+            usuario=admin_rel.id_usuario,
+            titulo="Cierre Mensual Generado",
+            mensaje=f"Se ha generado el cierre mensual del periodo {periodo} para {condominio.nombre}. Total cobrado: {len(cobros_generados)} unidades."
+        )
+
+    # 2. Notificar Residentes (Copropietarios y Arrendatarios)
+    # Iteramos sobre los cobros generados para saber a quién notificar
+    for cobro in cobros_generados:
+        unidad = cobro.id_unidad
+        # Buscar residentes activos
+        # Prioridad: Residentes (viven ahi) > Copropietarios (dueños)
+        # La lógica pedida: "Recibe aviso de 'Cobro Generado' (con el monto) al cerrar el mes."
+
+        destinatarios = set()
+
+        # Buscar residentes
+        residentes = Residencia.objects.filter(id_unidad=unidad, hasta__isnull=True)
+        for res in residentes:
+            destinatarios.add(res.id_usuario)
+
+        # Si no hay residente, notificar copropietario
+        if not residentes.exists():
+            coprops = Copropietario.objects.filter(id_unidad=unidad, hasta__isnull=True)
+            for cop in coprops:
+                destinatarios.add(cop.id_usuario)
+
+        for usuario_dest in destinatarios:
+            Notificacion.objects.create(
+                usuario=usuario_dest,
+                titulo="Gastos Comunes Disponibles",
+                mensaje=f"Se ha generado el cobro de Gastos Comunes para su unidad {unidad.codigo}. Periodo: {periodo}. Total a pagar: ${cobro.saldo:,.0f}"
+            )
+
     return cobros_generados
 
 def calcular_cobro_anexos(condominio, periodo):
@@ -509,6 +553,26 @@ def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None, usu
     # Si queda saldo a favor (monto_disponible > 0), queda como abono en el pago (no aplicado).
     # En un sistema real, se generaría un 'Saldo a Favor' para futuros cobros.
     # Aquí simplemente queda registrado el pago con monto mayor a lo aplicado.
+
+    # --- NOTIFICACIONES ---
+    # Notificar al residente "Pago Recibido"
+    from apps.usuarios.models import Residencia, Copropietario
+    destinatarios = set()
+    residentes = Residencia.objects.filter(id_unidad=unidad, hasta__isnull=True)
+    for res in residentes:
+        destinatarios.add(res.id_usuario)
+
+    if not destinatarios:
+        coprops = Copropietario.objects.filter(id_unidad=unidad, hasta__isnull=True)
+        for cop in coprops:
+            destinatarios.add(cop.id_usuario)
+
+    for usuario_dest in destinatarios:
+        Notificacion.objects.create(
+            usuario=usuario_dest,
+            titulo="Pago Confirmado",
+            mensaje=f"Hemos recibido su pago de ${monto:,.0f} para la unidad {unidad.codigo}. ¡Gracias!"
+        )
 
     return pago
 

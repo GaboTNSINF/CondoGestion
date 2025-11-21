@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Soporte - CondoGestión{% endblock %}
+
+{% block content %}
+<div class="row mb-3 align-items-center">
+    <div class="col-8">
+        <h4 class="mb-0">Ayuda y Soporte</h4>
+    </div>
+    <div class="col-4 text-end">
+        <a href="/" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-md-6">
+
+        <!-- WhatsApp Card -->
+        <div class="card shadow-sm mb-4 border-success border-start border-4">
+            <div class="card-body text-center p-4">
+                <div class="mb-3 text-success">
+                    <i class="fa-brands fa-whatsapp fa-4x"></i>
+                </div>
+                <h5 class="card-title fw-bold">WhatsApp Soporte</h5>
+                <p class="card-text text-muted">
+                    Respuesta Inmediata<br>
+                    (Lun-Vie 9:00 - 18:00)
+                </p>
+                <a href="https://wa.me/56912345678" target="_blank" class="btn btn-success btn-lg w-100 rounded-pill">
+                    <i class="fa-brands fa-whatsapp me-2"></i> Contactar ahora
+                </a>
+            </div>
+        </div>
+
+        <!-- Email Card -->
+        <div class="card shadow-sm mb-4 border-primary border-start border-4">
+            <div class="card-body text-center p-4">
+                <div class="mb-3 text-primary">
+                    <i class="fa-solid fa-envelope-open-text fa-4x"></i>
+                </div>
+                <h5 class="card-title fw-bold">Email Soporte</h5>
+                <p class="card-text text-muted">
+                    Respuesta máx 24 hrs hábiles
+                </p>
+                <a href="mailto:soporte@condogestion.cl" class="btn btn-primary btn-lg w-100 rounded-pill">
+                    <i class="fa-solid fa-envelope me-2"></i> Enviar Correo
+                </a>
+            </div>
+        </div>
+
+        <!-- FAQ Link (Optional) -->
+        <div class="text-center mt-3">
+            <a href="#" class="text-decoration-none text-muted">
+                <i class="fa-solid fa-circle-question me-1"></i> Preguntas Frecuentes
+            </a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

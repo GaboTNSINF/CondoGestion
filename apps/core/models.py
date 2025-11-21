@@ -1318,3 +1318,24 @@ class ResumenMensual(models.Model):
     class Meta:
         db_table = 'resumen_mensual'
         unique_together = ('id_condominio', 'periodo')
+
+class Notificacion(models.Model):
+    """
+    Sistema de mensajería interna y alertas.
+    """
+    id_notificacion = models.AutoField(primary_key=True)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        db_column='id_usuario'
+    )
+    titulo = models.CharField(max_length=100)
+    mensaje = models.TextField()
+    leido = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'notificacion'
+        verbose_name = 'Notificación'
+        verbose_name_plural = 'Notificaciones'
+        ordering = ['-created_at']

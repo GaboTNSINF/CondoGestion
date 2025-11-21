@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.db.models import Sum
 
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
-from .models import Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion
+from .models import Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion, Notificacion
 from .forms import GastoForm, PagoForm, TrabajadorForm, RemuneracionForm
 from .services import generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto
 
@@ -29,6 +29,25 @@ def index_view(request):
     }
     
     return render(request, 'index.html', contexto)
+
+@login_required
+def avisos_list_view(request):
+    """
+    Muestra las notificaciones del usuario.
+    """
+    notificaciones = Notificacion.objects.filter(usuario=request.user).order_by('-created_at')
+
+    # Marcar como leídas (opcional, para este MVP simplemente las listamos)
+    # notificaciones.update(leido=True)
+
+    return render(request, 'core/avisos_list.html', {'notificaciones': notificaciones})
+
+@login_required
+def soporte_view(request):
+    """
+    Vista estática de soporte.
+    """
+    return render(request, 'core/soporte.html')
 
 # --- FIN: Vistas del Dashboard ---
 
