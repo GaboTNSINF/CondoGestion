@@ -194,7 +194,7 @@ def aplicar_fondo_reserva(condominio, total_gastos, periodo):
         return Decimal(0)
 
     # 2. Calcular Monto
-    monto_fondo = total_gastos * (porcentaje / Decimal(100))
+    monto_fondo = total_gastos * (Decimal(porcentaje) / Decimal(100))
     monto_fondo = round(monto_fondo, 0) # Redondeo a entero
 
     if monto_fondo <= 0:
@@ -404,6 +404,25 @@ def calcular_cobro_anexos(condominio, periodo):
         codigo='ANEXO_EXTRA',
         defaults={'nombre': 'Cobro Anexo Extra'}
     )
+
+    # --- CORRECCIÓN IDEMPOTENCIA ---
+    # Antes de generar nuevos cargos por anexos para este periodo, eliminamos los generados automáticamente
+    # en corridas previas. Buscamos por condominio, periodo, concepto y tipo EXTRA.
+    # Nota: Esto asume que "ANEXO_EXTRA" solo se usa aquí.
+    cargos_previos = CargoUnidad.objects.filter(
+        id_unidad__id_grupo__id_condominio=condominio,
+        periodo=periodo,
+        id_concepto_cargo=concepto_anexo,
+        tipo=CargoUnidad.TipoCargo.EXTRA
+    )
+
+    # Primero borramos los CobroDetalle asociados para evitar huérfanos (aunque SET_NULL está activado,
+    # queremos borrar la línea del detalle también).
+    CobroDetalle.objects.filter(id_cargo_uni__in=cargos_previos).delete()
+
+    # Luego borramos los CargoUnidad
+    cargos_previos.delete()
+    # --- FIN CORRECCIÓN ---
 
     for regla in reglas:
         # Buscar unidades que coincidan con el subtipo de la regla
