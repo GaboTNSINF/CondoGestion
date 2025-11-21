@@ -1,53 +1,86 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Nuevo Gasto - {{ condominio.nombre }}</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-control { width: 100%; padding: 8px; box-sizing: border-box; }
-        .btn { padding: 10px 20px; border: none; cursor: pointer; text-decoration: none; display: inline-block; border-radius: 4px; }
-        .btn-primary { background-color: #007bff; color: white; }
-        .btn-secondary { background-color: #6c757d; color: white; }
-        .error { color: red; font-size: 0.9em; }
-    </style>
-</head>
-<body>
+{% extends 'base.html' %}
 
-    <h1>Registrar Nuevo Gasto</h1>
-    <h2>{{ condominio.nombre }}</h2>
-    <hr>
+{% block title %}Nuevo Gasto - {{ condominio.nombre }}{% endblock %}
 
-    <form method="post">
-        {% csrf_token %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
 
-        {% if form.errors %}
-            <div class="error">
-                <p>Por favor corrige los errores abajo indicados.</p>
-                {{ form.errors }}
-            </div>
-        {% endif %}
-
-        {% for field in form %}
-            <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                    <small style="color: grey">{{ field.help_text }}</small>
-                {% endif %}
-                {% for error in field.errors %}
-                    <div class="error">{{ error }}</div>
-                {% endfor %}
-            </div>
-        {% endfor %}
-
-        <div style="margin-top: 20px;">
-            <button type="submit" class="btn btn-primary">Guardar Gasto</button>
-            <a href="{% url 'gastos_list' condominio.id_condominio %}" class="btn btn-secondary">Cancelar</a>
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">Nuevo Gasto</h4>
+            <a href="{% url 'gastos_list' condominio.id_condominio %}" class="btn btn-close" aria-label="Close"></a>
         </div>
-    </form>
 
-</body>
-</html>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
+
+                            <!-- Add Bootstrap classes to form fields via widget manipulation in template is hard,
+                                 so we wrap or just let default rendering happen but typically we need 'form-control' class.
+                                 Since we can't easily inject classes into Django form fields without backend changes or custom tags,
+                                 we will use a small JS snippet or simply wrap them.
+                                 However, a better way in templates without widget tweaks: -->
+
+                            <div class="input-group">
+                                {{ field }}
+                            </div>
+
+                            {% if field.help_text %}
+                                <div class="form-text">{{ field.help_text }}</div>
+                            {% endif %}
+
+                            {% if field.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in field.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fa-solid fa-save me-2"></i> Guardar Gasto
+                        </button>
+                        <a href="{% url 'gastos_list' condominio.id_condominio %}" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Script to add Bootstrap classes to Django form fields automatically
+    document.addEventListener("DOMContentLoaded", function() {
+        var inputs = document.querySelectorAll('input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="date"], select, textarea');
+        inputs.forEach(function(input) {
+            input.classList.add('form-control');
+        });
+
+        var checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(function(check) {
+            check.classList.add('form-check-input');
+        });
+    });
+</script>
+{% endblock %}

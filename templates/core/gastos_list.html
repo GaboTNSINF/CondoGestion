@@ -1,92 +1,93 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Gastos - {{ condominio.nombre }}</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .header { display: flex; justify-content: space-between; align-items: center; }
-        .btn { padding: 8px 16px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-primary { background-color: #007bff; color: white; }
-        .btn-secondary { background-color: #6c757d; color: white; }
-        .status-paid { color: green; font-weight: bold; }
-        .status-pending { color: orange; font-weight: bold; }
-    </style>
-</head>
-<body>
+{% extends 'base.html' %}
 
-    <div class="header">
-        <div>
-            <h1>Gastos Comunes</h1>
-            <h2>{{ condominio.nombre }}</h2>
-        </div>
-        <div>
-            <a href="{% url 'index' %}" class="btn btn-secondary">Volver al Dashboard</a>
-        </div>
+{% block title %}Gastos - {{ condominio.nombre }}{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="row mb-3 align-items-center">
+    <div class="col-8">
+        <h4 class="mb-0 text-truncate">Gastos</h4>
+        <small class="text-muted">{{ condominio.nombre }}</small>
     </div>
-
-    <hr>
-
-    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-        <h3>Listado de Gastos Registrados</h3>
-        <a href="{% url 'gasto_create' condominio.id_condominio %}" class="btn btn-primary">Nuevo Gasto</a>
+    <div class="col-4 text-end">
+        <a href="{% url 'index' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
     </div>
+</div>
 
-    {% if gastos %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Periodo</th>
-                    <th>Fecha Emisión</th>
-                    <th>Categoría</th>
-                    <th>Proveedor</th>
-                    <th>Documento</th>
-                    <th>Folio</th>
-                    <th>Descripción</th>
-                    <th>Monto Total</th>
-                    <th>Evidencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for gasto in gastos %}
-                <tr>
-                    <td>{{ gasto.periodo }}</td>
-                    <td>{{ gasto.fecha_emision|date:"d/m/Y" }}</td>
-                    <td>{{ gasto.id_gasto_categ.nombre }}</td>
-                    <td>
+<!-- Filters / Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <a href="{% url 'gasto_create' condominio.id_condominio %}" class="btn btn-primary w-100 shadow-sm">
+            <i class="fa-solid fa-plus-circle me-2"></i>Registrar Nuevo Gasto
+        </a>
+    </div>
+</div>
+
+<!-- Expenses List -->
+{% if gastos %}
+    <div class="row">
+        {% for gasto in gastos %}
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <div class="card h-100 border-start border-4 border-primary shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <span class="badge bg-primary mb-1">{{ gasto.periodo }}</span>
+                            <span class="badge bg-light text-dark border">{{ gasto.id_gasto_categ.nombre }}</span>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="mb-0 fw-bold text-success">$ {{ gasto.total|floatformat:0 }}</h5>
+                        </div>
+                    </div>
+
+                    <h6 class="card-title text-dark mb-1">
                         {% if gasto.id_proveedor %}
                             {{ gasto.id_proveedor.nombre }}
                         {% else %}
-                            -
+                            <span class="text-muted fst-italic">Sin Proveedor</span>
                         {% endif %}
-                    </td>
-                    <td>
-                        {% if gasto.id_doc_tipo %}
-                            {{ gasto.id_doc_tipo.nombre }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>{{ gasto.documento_folio|default:"-" }}</td>
-                    <td>{{ gasto.descripcion|default:"-" }}</td>
-                    <td>$ {{ gasto.total|floatformat:0 }}</td>
-                    <td>
-                        {% if gasto.evidencia_url %}
-                            <a href="{{ gasto.evidencia_url }}" target="_blank">Ver</a>
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No hay gastos registrados para este condominio.</p>
-    {% endif %}
+                    </h6>
 
-</body>
-</html>
+                    <p class="card-text small text-muted mb-2">
+                        {{ gasto.descripcion|default:"Sin descripción"|truncatechars:60 }}
+                    </p>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top small">
+                        <div class="text-muted">
+                            <i class="fa-regular fa-calendar me-1"></i> {{ gasto.fecha_emision|date:"d/m/Y" }}
+                        </div>
+                        <div>
+                            {% if gasto.evidencia_url %}
+                                <a href="{{ gasto.evidencia_url }}" target="_blank" class="text-decoration-none">
+                                    <i class="fa-solid fa-paperclip me-1"></i> Evidencia
+                                </a>
+                            {% endif %}
+                            {% if gasto.documento_folio %}
+                                <span class="ms-2 badge bg-secondary text-light">{{ gasto.documento_folio }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-5">
+        <div class="mb-3 text-muted">
+            <i class="fa-solid fa-file-invoice-dollar fa-4x"></i>
+        </div>
+        <h5>No hay gastos registrados</h5>
+        <p class="text-muted">Comienza registrando el primer gasto común del condominio.</p>
+    </div>
+{% endif %}
+
+<!-- Floating Action Button (Optional alternative for mobile) -->
+<!-- <div class="position-fixed bottom-0 end-0 p-3 d-md-none" style="z-index: 11">
+    <a href="{% url 'gasto_create' condominio.id_condominio %}" class="btn btn-primary rounded-circle shadow-lg p-3">
+        <i class="fa-solid fa-plus fa-lg"></i>
+    </a>
+</div> -->
+{% endblock %}
