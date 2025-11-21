@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load core_extras %}
 
 {% block title %}Cierre Mensual - {{ condominio.nombre }}{% endblock %}
 
@@ -22,7 +23,7 @@
         <!-- Period Card -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-light text-center py-3">
-                <h5 class="mb-0">Periodo: <span class="badge bg-primary">{{ periodo }}</span></h5>
+                <h5 class="mb-0">Periodo: <span class="badge bg-primary">{{ periodo|format_period }}</span></h5>
             </div>
             <div class="card-body">
                 <h6 class="text-muted text-uppercase small mb-3">Resumen Financiero</h6>

@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
+{% load core_extras %}
 
-{% block title %}Cobros {{ periodo }} - {{ condominio.nombre }}{% endblock %}
+{% block title %}Cobros {{ periodo|format_period }} - {{ condominio.nombre }}{% endblock %}
 
 {% block content %}
 <!-- Header -->
 <div class="row mb-3 align-items-center">
     <div class="col-8">
         <h4 class="mb-0 text-truncate">Cobros Generados</h4>
-        <small class="text-muted">{{ condominio.nombre }} - Periodo {{ periodo }}</small>
+        <small class="text-muted">{{ condominio.nombre }} - Periodo {{ periodo|format_period }}</small>
     </div>
     <div class="col-4 text-end">
         <a href="{% url 'cierre_mensual' condominio.id_condominio %}?periodo={{ periodo }}" class="btn btn-outline-secondary btn-sm">

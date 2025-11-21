@@ -1,11 +1,12 @@
 from django import forms
+from django.utils import timezone
 from .models import Gasto, Pago, CatMetodoPago, Trabajador, Remuneracion
 
 class GastoForm(forms.ModelForm):
     class Meta:
         model = Gasto
         fields = [
-            'periodo',
+            # 'periodo',  <-- Removed from visible fields, auto-calculated
             'id_gasto_categ',
             'id_proveedor',
             'id_doc_tipo',
@@ -20,7 +21,7 @@ class GastoForm(forms.ModelForm):
         widgets = {
             'fecha_emision': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
             'fecha_venc': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
-            'periodo': forms.TextInput(attrs={'placeholder': 'YYYYMM', 'class': 'form-control form-control-lg'}),
+            # 'periodo': forms.TextInput(attrs={'placeholder': 'YYYYMM', 'class': 'form-control form-control-lg'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control form-control-lg'}),
             'neto': forms.NumberInput(attrs={'class': 'form-control form-control-lg'}),
             'iva': forms.NumberInput(attrs={'class': 'form-control form-control-lg'}),
@@ -37,6 +38,17 @@ class GastoForm(forms.ModelForm):
             'documento_folio': 'Folio Documento',
             'evidencia_url': 'URL Evidencia (opcional)',
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set default date to today
+        today = timezone.now().date()
+        if not self.instance.pk and 'fecha_emision' not in self.initial:
+            self.initial['fecha_emision'] = today
+        if not self.instance.pk and 'fecha_venc' not in self.initial:
+            self.initial['fecha_venc'] = today
+
+    # Removed clean_periodo as field is removed from form
 
 class PagoForm(forms.ModelForm):
     class Meta:
@@ -57,6 +69,11 @@ class PagoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         condominio_id = kwargs.pop('condominio_id', None)
         super().__init__(*args, **kwargs)
+
+        # Default to today
+        if not self.instance.pk and 'fecha_pago' not in self.initial:
+            self.initial['fecha_pago'] = timezone.now().date()
+
         if condominio_id:
             # Filter units by condominio
             from .models import Unidad
