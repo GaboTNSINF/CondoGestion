@@ -272,3 +272,34 @@ class Residencia(models.Model):
         verbose_name_plural = 'Residentes'
 
 # --- FIN: Modelos de Relación Usuario-Unidad ---
+
+# --- INICIO: Modelo Código de Verificación (2FA) ---
+
+class CodigoVerificacion(models.Model):
+    """
+    Almacena códigos OTP para validación de acciones críticas (2FA).
+    """
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        db_column='id_usuario'
+    )
+    codigo = models.CharField(max_length=6)
+    accion = models.CharField(max_length=50) # ej: 'perfil_update'
+    creado_at = models.DateTimeField(auto_now_add=True)
+
+    def es_valido(self):
+        # Importación tardía para evitar circular imports si los hubiera
+        from django.utils import timezone
+        import datetime
+
+        # 10 minutos de validez
+        expiracion = self.creado_at + datetime.timedelta(minutes=10)
+        return timezone.now() <= expiracion
+
+    class Meta:
+        db_table = 'codigo_verificacion'
+        verbose_name = 'Código de Verificación'
+        verbose_name_plural = 'Códigos de Verificación'
+
+# --- FIN: Modelo Código de Verificación (2FA) ---

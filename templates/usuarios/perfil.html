@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Mi Perfil - CondoGestión{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">Mi Perfil</h4>
+            <a href="/" class="btn btn-close" aria-label="Close"></a>
+        </div>
+
+        <!-- Personal Data Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 text-primary"><i class="fa-solid fa-user-pen me-2"></i>Datos Personales</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <!-- Profile Form Fields -->
+                    {% for field in profile_form %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <div class="d-grid">
+                        <button type="submit" name="update_profile" class="btn btn-primary btn-lg">
+                            <i class="fa-solid fa-save me-2"></i> Guardar Cambios
+                        </button>
+                        <small class="text-muted text-center mt-2">
+                            <i class="fa-solid fa-shield-halved me-1"></i>
+                            Los cambios requieren verificación por correo (2FA).
+                        </small>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Security Card -->
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 text-danger"><i class="fa-solid fa-lock me-2"></i>Seguridad</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="change_password" value="1">
+
+                    {% for field in password_form %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                                <div class="form-text small">{{ field.help_text }}</div>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-outline-danger btn-lg">
+                            <i class="fa-solid fa-key me-2"></i> Cambiar Contraseña
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Add bootstrap classes to password form manually since it's standard Django form
+    document.addEventListener("DOMContentLoaded", function() {
+        var inputs = document.querySelectorAll('input[type="password"]');
+        inputs.forEach(function(input) {
+            input.classList.add('form-control');
+            input.classList.add('form-control-lg');
+        });
+    });
+</script>
+{% endblock %}
