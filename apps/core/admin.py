@@ -1,3 +1,4 @@
+# apps/core/admin.py
 # Importamos el módulo 'admin' de Django
 from django.contrib import admin
 # Importamos los modelos que hemos creado en 'core'

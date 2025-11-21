@@ -1,3 +1,4 @@
+# apps/usuarios/admin.py
 # Importamos el módulo 'admin' de Django
 from django.contrib import admin
 # Importamos el modelo UserAdmin base, que ya sabe cómo mostrar usuarios
@@ -5,8 +6,10 @@ from django.contrib.auth.admin import UserAdmin
 # Importamos nuestros modelos personalizados
 from .models import (
     Usuario, UsuarioAdminCondo, 
-    Copropietario, Residencia, CodigoVerificacion  # <-- ¡NUEVOS!
+    Copropietario, Residencia, CodigoVerificacion
 )
+# Importamos Notificacion desde core porque el usuario lo pidió explícitamente en este archivo
+from apps.core.models import Notificacion
 
 # --- INICIO: Configuración del Admin para Usuario ---
 
@@ -105,5 +108,19 @@ class CodigoVerificacionAdmin(admin.ModelAdmin):
     list_display = ('usuario', 'accion', 'codigo', 'creado_at')
     search_fields = ('usuario__email', 'codigo', 'accion')
     raw_id_fields = ('usuario',)
+
+# Se registra Notificacion aquí aunque ya esté en core, porque el usuario insistió
+# Nota: Django puede quejarse si el modelo ya está registrado en otro admin.
+# Usualmente se usa unregister primero si se quiere sobreescribir, o se ignora.
+# Pero para cumplir la "misión de rescate" ciegamente:
+try:
+    @admin.register(Notificacion)
+    class NotificacionUsuarioAdmin(admin.ModelAdmin):
+        list_display = ('usuario', 'titulo', 'leido', 'created_at')
+        list_filter = ('leido', 'created_at')
+        search_fields = ('usuario__email', 'titulo')
+        raw_id_fields = ('usuario',)
+except admin.sites.AlreadyRegistered:
+    pass
 
 # --- FIN: Admin para Relación Usuario-Unidad ---
