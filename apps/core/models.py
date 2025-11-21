@@ -1069,3 +1069,43 @@ class Remuneracion(models.Model):
         verbose_name_plural = 'Remuneraciones'
 
 # --- FIN: Modelos de RRHH ---
+
+# --- INICIO: Reglas de Negocio (Finanzas) ---
+
+class InteresRegla(models.Model):
+    """
+    [MAPEO: Tabla 'interes_regla']
+    Define las reglas para el cálculo de intereses por mora.
+    """
+    id_interes_regla = models.AutoField(primary_key=True)
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.RESTRICT,
+        db_column='id_condominio'
+    )
+    id_segmento = models.ForeignKey(
+        CatSegmento,
+        on_delete=models.RESTRICT,
+        db_column='id_segmento'
+    )
+    vigente_desde = models.DateField()
+    vigente_hasta = models.DateField(null=True, blank=True)
+    tasa_anual_pct = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        verbose_name="Tasa Anual %"
+    )
+    dias_gracia = models.PositiveSmallIntegerField(default=0)
+    fuente_url = models.CharField(max_length=300, null=True, blank=True)
+    comentario = models.CharField(max_length=300, null=True, blank=True)
+
+    def __str__(self):
+        return f"Regla Interés {self.tasa_anual_pct}% ({self.id_condominio.nombre})"
+
+    class Meta:
+        db_table = 'interes_regla'
+        verbose_name = 'Regla de Interés'
+        verbose_name_plural = 'Reglas de Interés'
+        indexes = [
+            models.Index(fields=['id_condominio', 'id_segmento', 'vigente_desde', 'vigente_hasta'], name='ix_ir_rango'),
+        ]

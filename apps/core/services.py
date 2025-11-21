@@ -1,10 +1,11 @@
 from decimal import Decimal
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q
+from django.utils import timezone
 from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
     Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
-    CatMetodoPago
+    CatMetodoPago, InteresRegla
 )
 
 def calcular_factores_prorrateo(prorrateo_regla: ProrrateoRegla):
@@ -86,6 +87,77 @@ def crear_regla_gasto_comun_default(condominio):
 
     return regla
 
+def calcular_intereses_mora(cobro_actual: Cobro, periodo_actual: str):
+    """
+    Calcula el interés por mora basado en deudas anteriores pendientes
+    y agrega el detalle al cobro actual.
+    """
+    unidad = cobro_actual.id_unidad
+    condominio = unidad.id_grupo.id_condominio
+
+    # 1. Buscar si hay deuda vencida (cobros anteriores con saldo > 0)
+    deuda_vencida_qs = Cobro.objects.filter(
+        id_unidad=unidad,
+        saldo__gt=0,
+        periodo__lt=periodo_actual # Solo periodos anteriores
+    )
+
+    if not deuda_vencida_qs.exists():
+        return Decimal(0)
+
+    total_deuda_vencida = deuda_vencida_qs.aggregate(Sum('saldo'))['saldo__sum'] or Decimal(0)
+
+    if total_deuda_vencida <= 0:
+        return Decimal(0)
+
+    # 2. Buscar regla de interés vigente para el segmento de la unidad
+    # Asumimos fecha actual o primer día del periodo para vigencia
+    # TODO: Parsear periodo YYYYMM a date real
+    hoy = timezone.now().date()
+
+    regla_interes = InteresRegla.objects.filter(
+        id_condominio=condominio,
+        id_segmento=unidad.id_segmento,
+        vigente_desde__lte=hoy
+    ).filter(
+        Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=hoy)
+    ).first()
+
+    if not regla_interes:
+        # No hay regla de interés, no se cobra
+        return Decimal(0)
+
+    # 3. Calcular Interés
+    # Interés Simple Mensual = Deuda * (TasaAnual / 12) / 100
+    tasa_anual = regla_interes.tasa_anual_pct
+    interes_mensual_pct = tasa_anual / Decimal(12)
+
+    monto_interes = total_deuda_vencida * (interes_mensual_pct / Decimal(100))
+
+    # Redondeo (peso entero)
+    monto_interes = round(monto_interes, 0)
+
+    if monto_interes <= 0:
+        return Decimal(0)
+
+    # 4. Agregar detalle al cobro actual
+    CobroDetalle.objects.update_or_create(
+        id_cobro=cobro_actual,
+        tipo=CobroDetalle.TipoDetalle.INTERES_MORA,
+        defaults={
+            'monto': monto_interes,
+            'glosa': f"Interés por mora {tasa_anual}% anual sobre deuda vencida de ${total_deuda_vencida:,.0f}",
+            # 'id_interes_regla': regla_interes # Si agregáramos el campo al modelo
+        }
+    )
+
+    # Actualizar total de intereses en la cabecera
+    cobro_actual.total_interes = monto_interes
+    # Importante: No guardar cobro_actual aquí si luego vamos a sumar todo,
+    # pero es seguro actualizar el campo.
+
+    return monto_interes
+
 @transaction.atomic
 def generar_cierre_mensual(condominio, periodo):
     """
@@ -94,59 +166,41 @@ def generar_cierre_mensual(condominio, periodo):
     2. Obtiene la regla de prorrateo (Gasto Común) vigente.
     3. Distribuye el total de gastos entre las unidades.
     4. Crea los registros de Cobro y CobroDetalle.
+    5. Calcula intereses por mora sobre deudas anteriores.
     """
 
     # 1. Sumar gastos del periodo
-    # TODO: Filtrar solo gastos no anulados si existiera estado
     total_gastos = Gasto.objects.filter(
         id_condominio=condominio,
         periodo=periodo
     ).aggregate(Sum('total'))['total__sum'] or Decimal(0)
 
-    if total_gastos <= 0:
-        # Podríamos permitir cierre en 0, pero por ahora asumimos que debe haber gastos
-        # O simplemente generamos cobros en 0.
-        pass
-
     # 2. Obtener regla de prorrateo vigente
-    # Asumimos una única regla ordinaria por defecto por ahora
-    # En un sistema real, buscaríamos la regla activa para la fecha del periodo
     regla_prorrateo = ProrrateoRegla.objects.filter(
         id_condominio=condominio,
         tipo=ProrrateoRegla.TipoProrrateo.ORDINARIO
     ).first()
 
     if not regla_prorrateo:
-        # Si no existe, intentamos crear la default
         regla_prorrateo = crear_regla_gasto_comun_default(condominio)
 
-    # Aseguramos que existan factores
     if not ProrrateoFactorUnidad.objects.filter(id_prorrateo=regla_prorrateo).exists():
         calcular_factores_prorrateo(regla_prorrateo)
 
     factores = ProrrateoFactorUnidad.objects.filter(id_prorrateo=regla_prorrateo)
 
-    # Estado inicial del cobro (ej: 'EMITIDO' o 'BORRADOR')
-    # Vamos a asumir 'BORRADOR' o 'POR_PAGAR'.
-    # Creemos el estado si no existe
     estado_pendiente, _ = CatCobroEstado.objects.get_or_create(codigo='PENDIENTE')
 
     cobros_generados = []
 
-    # 3. Iterar por cada unidad y generar su cobro
+    # 3. Iterar por cada unidad y generar su cobro base
     for factor_obj in factores:
         unidad = factor_obj.id_unidad
         factor = factor_obj.factor
 
-        # Monto a cobrar a esta unidad
-        monto_prorrateado = total_gastos * factor
-        # Redondear (en Chile se usa peso entero, en otros lados 2 decimales)
-        # Usaremos 0 decimales para pesos (CLP) o 2 para USD según configuración,
-        # por defecto del modelo es 2 decimales.
-        monto_prorrateado = round(monto_prorrateado, 0)
+        monto_prorrateado = round(total_gastos * factor, 0)
 
-        # Crear el Cobro (Cabecera)
-        # Usamos update_or_create para permitir re-generar el cierre (idempotencia básica)
+        # Crear/Actualizar Cabecera
         cobro, created = Cobro.objects.update_or_create(
             id_unidad=unidad,
             periodo=periodo,
@@ -154,14 +208,14 @@ def generar_cierre_mensual(condominio, periodo):
             defaults={
                 'id_cobro_estado': estado_pendiente,
                 'id_prorrateo': regla_prorrateo,
-                'total_cargos': monto_prorrateado, # Por ahora solo este cargo
-                'saldo': monto_prorrateado,        # Asumiendo 0 pagos previos
+                # Inicializamos valores, luego sumamos
+                'total_cargos': monto_prorrateado,
+                'saldo': 0, # Se recalcula al final
                 'observacion': f"Cierre Mensual {periodo}"
             }
         )
 
-        # Crear el Detalle (Cargo por Gasto Común)
-        # Primero creamos el CargoUnidad (Registro histórico del cargo)
+        # Detalle Gasto Común
         cargo_uni, _ = CargoUnidad.objects.update_or_create(
             id_unidad=unidad,
             periodo=periodo,
@@ -172,7 +226,6 @@ def generar_cierre_mensual(condominio, periodo):
             }
         )
 
-        # Luego el detalle en el cobro
         CobroDetalle.objects.update_or_create(
             id_cobro=cobro,
             tipo=CobroDetalle.TipoDetalle.CARGO_COMUN,
@@ -183,6 +236,22 @@ def generar_cierre_mensual(condominio, periodo):
             }
         )
 
+        # --- NUEVO: Calcular Intereses por Mora ---
+        interes = calcular_intereses_mora(cobro, periodo)
+
+        # Recalcular Totales Finales del Cobro
+        # Total Cargos = GC + Otros Cargos (que no tenemos aun)
+        # Total Cobro = Total Cargos + Intereses - Descuentos
+
+        cobro.total_cargos = monto_prorrateado
+        cobro.total_interes = interes
+
+        total_a_pagar = cobro.total_cargos + cobro.total_interes - cobro.total_descuentos
+
+        # El saldo inicial es el total a pagar (asumiendo 0 pagado en este cobro nuevo)
+        cobro.saldo = total_a_pagar - cobro.total_pagado
+
+        cobro.save()
         cobros_generados.append(cobro)
 
     return cobros_generados
