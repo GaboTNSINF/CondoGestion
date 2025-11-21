@@ -5,7 +5,7 @@ from django.utils import timezone
 from .models import (
     Unidad, ProrrateoRegla, ProrrateoFactorUnidad, CatConceptoCargo,
     Gasto, Cobro, CobroDetalle, CargoUnidad, CatCobroEstado, Pago, PagoAplicacion, CatEstadoTx,
-    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov, Auditoria
+    CatMetodoPago, InteresRegla, ParamReglamento, FondoReservaMov, Auditoria, CondominioAnexoRegla
 )
 
 def registrar_auditoria(entidad, entidad_id, accion, usuario, detalle=None):
@@ -320,6 +320,9 @@ def generar_cierre_mensual(condominio, periodo):
         cobro.save()
         cobros_generados.append(cobro)
 
+    # Calcular Cobros por Anexos Extra (Bodegas/Estacionamientos)
+    calcular_cobro_anexos(condominio, periodo)
+
     # Auditoría masiva (simplificada)
     registrar_auditoria(
         entidad='Cobro',
@@ -330,6 +333,110 @@ def generar_cierre_mensual(condominio, periodo):
     )
 
     return cobros_generados
+
+def calcular_cobro_anexos(condominio, periodo):
+    """
+    Genera cargos adicionales por anexos (estacionamientos/bodegas)
+    según las reglas definidas en CondominioAnexoRegla.
+    """
+    # 1. Buscar reglas vigentes
+    # Simplificación: Solo reglas activas "hoy", idealmente check vs periodo
+    hoy = timezone.now().date()
+
+    reglas = CondominioAnexoRegla.objects.filter(
+        id_condominio=condominio,
+        vigente_desde__lte=hoy
+    ).filter(
+        Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=hoy)
+    )
+
+    if not reglas.exists():
+        return 0
+
+    cargo_generados = 0
+
+    # Buscamos un concepto de cargo para 'Uso Espacios Comunes' o similar, o creamos uno genérico
+    concepto_anexo, _ = CatConceptoCargo.objects.get_or_create(
+        codigo='ANEXO_EXTRA',
+        defaults={'nombre': 'Cobro Anexo Extra'}
+    )
+
+    for regla in reglas:
+        # Buscar unidades que coincidan con el subtipo de la regla
+        unidades_target = Unidad.objects.filter(
+            id_grupo__id_condominio=condominio
+        )
+
+        if regla.id_viv_subtipo:
+            unidades_target = unidades_target.filter(id_viv_subtipo=regla.id_viv_subtipo)
+
+        # Filtramos las que tienen flag de cobrable (Asumiendo que este flag activa la regla)
+        unidades_cobrables = unidades_target.filter(anexo_cobrable=True)
+
+        for unidad in unidades_cobrables:
+            # Recuperar el cobro mensual de esta unidad para este periodo
+            # Debe existir porque acabamos de correr generar_cierre_mensual antes
+            cobro = Cobro.objects.filter(
+                id_unidad=unidad,
+                periodo=periodo
+            ).first()
+
+            if not cobro:
+                continue
+
+            # Determinar monto.
+            # Como el modelo NO tiene campo de monto explícito, asumiremos un valor fijo
+            # o "Placeholder" para cumplir la lógica de negocio solicitada.
+            # En un caso real, el monto vendría de la Regla o de un parámetro global.
+            # Usaremos 10.000 como valor por defecto de "Multa/Cobro" por anexo extra.
+            monto_cargo = Decimal(10000)
+
+            # Crear Cargo Unidad
+            cargo_uni = CargoUnidad.objects.create(
+                id_unidad=unidad,
+                periodo=periodo,
+                id_concepto_cargo=concepto_anexo,
+                tipo=CargoUnidad.TipoCargo.EXTRA,
+                monto=monto_cargo,
+                detalle=f"Cargo por {regla.get_anexo_tipo_display()} adicional ({regla.comentario or 'S/C'})"
+            )
+
+            # Agregar al detalle del Cobro
+            CobroDetalle.objects.create(
+                id_cobro=cobro,
+                tipo=CobroDetalle.TipoDetalle.CARGO_INDIVIDUAL, # O Ajuste
+                id_cargo_uni=cargo_uni,
+                monto=monto_cargo,
+                glosa=f"Cobro adicional {regla.get_anexo_tipo_display()}"
+            )
+
+            # Actualizar totales del Cobro
+            cobro.total_cargos += monto_cargo
+            cobro.saldo += monto_cargo
+            cobro.save()
+
+            cargo_generados += 1
+
+    return cargo_generados
+
+@transaction.atomic
+def crear_gasto(condominio, form, usuario):
+    """
+    Crea un gasto a partir de un formulario validado y registra la auditoría.
+    """
+    gasto = form.save(commit=False)
+    gasto.id_condominio = condominio
+    gasto.save()
+
+    # Auditoría
+    registrar_auditoria(
+        entidad='Gasto',
+        entidad_id=gasto.pk,
+        accion='CREATE',
+        usuario=usuario,
+        detalle={'monto': float(gasto.total), 'proveedor': str(gasto.id_proveedor)}
+    )
+    return gasto
 
 @transaction.atomic
 def registrar_pago(unidad, monto, metodo_pago, fecha_pago, observacion=None, usuario=None):

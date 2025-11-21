@@ -8,7 +8,7 @@ from django.db.models import Sum
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
 from .models import Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion
 from .forms import GastoForm, PagoForm, TrabajadorForm, RemuneracionForm
-from .services import generar_cierre_mensual, registrar_pago, registrar_auditoria
+from .services import generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto
 
 # --- INICIO: Vistas del Dashboard ---
 
@@ -65,20 +65,8 @@ def gasto_create_view(request, condominio_id):
     if request.method == 'POST':
         form = GastoForm(request.POST)
         if form.is_valid():
-            # No guardamos inmediatamente para asignar el condominio
-            gasto = form.save(commit=False)
-            gasto.id_condominio = condominio
-            gasto.save()
-
-            # Auditoría manual para el gasto
-            registrar_auditoria(
-                entidad='Gasto',
-                entidad_id=gasto.pk,
-                accion='CREATE',
-                usuario=request.user,
-                detalle={'monto': float(gasto.total), 'proveedor': str(gasto.id_proveedor)}
-            )
-
+            # Delegamos la creación al servicio para asegurar auditoría
+            crear_gasto(condominio, form, request.user)
             return redirect('gastos_list', condominio_id=condominio.id_condominio)
     else:
         form = GastoForm()
