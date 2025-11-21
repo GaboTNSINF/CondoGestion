@@ -194,7 +194,7 @@ def aplicar_fondo_reserva(condominio, total_gastos, periodo):
         return Decimal(0)
 
     # 2. Calcular Monto
-    monto_fondo = total_gastos * (porcentaje / Decimal(100))
+    monto_fondo = total_gastos * (Decimal(porcentaje) / Decimal(100))
     monto_fondo = round(monto_fondo, 0) # Redondeo a entero
 
     if monto_fondo <= 0:
