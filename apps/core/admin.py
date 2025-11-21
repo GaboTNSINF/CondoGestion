@@ -6,7 +6,9 @@ from .models import (
     CatSegmento, CatUnidadTipo, CatViviendaSubtipo,
     Grupo, Unidad,
     CatDocTipo, Proveedor,
-    GastoCategoria, Gasto  # <-- ¡NUEVOS IMPORTES!
+    GastoCategoria, Gasto,
+    # --- NUEVOS MODELOS FALTANTES ---
+    ParamReglamento, FondoReservaMov, InteresRegla, Auditoria, CondominioAnexoRegla
 )
 
 # --- INICIO: Admin para Catálogos de Unidad ---
@@ -40,7 +42,7 @@ class CatTipoCuentaAdmin(admin.ModelAdmin):
     search_fields = ('codigo', 'nombre')
     ordering = ('id_tipo_cuenta',)
 
-@admin.register(CatDocTipo) # <-- ¡NUEVO!
+@admin.register(CatDocTipo)
 class CatDocTipoAdmin(admin.ModelAdmin):
     """
     Configuración del admin para el catálogo de Tipos de Documento.
@@ -133,7 +135,7 @@ class UnidadAdmin(admin.ModelAdmin):
 # --- FIN: Admin para Estructura Interna ---
 
 
-# --- INICIO: Admin para Proveedor --- ¡NUEVO! ---
+# --- INICIO: Admin para Proveedor ---
 
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):
@@ -198,7 +200,7 @@ class SuscripcionAdmin(admin.ModelAdmin):
 # --- FIN: Admin para Suscripcion ---
 
 
-# --- INICIO: Admin de Gastos (Sprint 2) --- ¡NUEVO! ---
+# --- INICIO: Admin de Gastos (Sprint 2) ---
 
 @admin.register(GastoCategoria)
 class GastoCategoriaAdmin(admin.ModelAdmin):
@@ -239,3 +241,47 @@ class GastoAdmin(admin.ModelAdmin):
     readonly_fields = ('total',)
 
 # --- FIN: Admin de Gastos ---
+
+
+# --- INICIO: Admin Faltantes Críticos (Gap Analysis) ---
+
+@admin.register(ParamReglamento)
+class ParamReglamentoAdmin(admin.ModelAdmin):
+    list_display = ('id_condominio', 'recargo_fondo_reserva_pct', 'interes_mora_anual_pct', 'dias_gracia')
+    search_fields = ('id_condominio__nombre',)
+    raw_id_fields = ('id_condominio',)
+
+@admin.register(InteresRegla)
+class InteresReglaAdmin(admin.ModelAdmin):
+    list_display = ('id_condominio', 'id_segmento', 'tasa_anual_pct', 'vigente_desde')
+    list_filter = ('id_condominio',)
+    raw_id_fields = ('id_condominio', 'id_segmento')
+
+@admin.register(FondoReservaMov)
+class FondoReservaMovAdmin(admin.ModelAdmin):
+    list_display = ('id_condominio', 'fecha', 'tipo', 'monto', 'periodo')
+    list_filter = ('id_condominio', 'tipo', 'periodo')
+    search_fields = ('glosa',)
+    raw_id_fields = ('id_condominio',)
+    readonly_fields = ('fecha',) # Por seguridad, no modificar fecha de movimiento
+
+@admin.register(CondominioAnexoRegla)
+class CondominioAnexoReglaAdmin(admin.ModelAdmin):
+    list_display = ('id_condominio', 'anexo_tipo', 'id_viv_subtipo', 'vigente_desde')
+    list_filter = ('id_condominio', 'anexo_tipo')
+    raw_id_fields = ('id_condominio', 'id_viv_subtipo')
+
+@admin.register(Auditoria)
+class AuditoriaAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'usuario_email', 'accion', 'entidad', 'entidad_id')
+    list_filter = ('accion', 'entidad', 'created_at')
+    search_fields = ('usuario_email', 'entidad_id', 'detalle')
+    # La auditoría debe ser de solo lectura
+    def has_add_permission(self, request):
+        return False
+    def has_change_permission(self, request, obj=None):
+        return False
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+# --- FIN: Admin Faltantes Críticos ---

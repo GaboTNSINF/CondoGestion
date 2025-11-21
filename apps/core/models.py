@@ -1174,3 +1174,74 @@ class FondoReservaMov(models.Model):
         indexes = [
             models.Index(fields=['id_condominio', 'fecha'], name='ix_fr'),
         ]
+
+# --- INICIO: Modelos de Auditoría y Reglas Anexas (Gap Analysis) ---
+
+class Auditoria(models.Model):
+    """
+    [MAPEO: Tabla 'auditoria']
+    Registro de auditoría para trazabilidad total de acciones (Crea, Modifica, Elimina).
+    """
+    id_auditoria = models.AutoField(primary_key=True)
+    entidad = models.CharField(max_length=40) # Nombre de la tabla/modelo
+    entidad_id = models.BigIntegerField() # ID del registro afectado
+    accion = models.CharField(max_length=10) # 'CREATE', 'UPDATE', 'DELETE'
+
+    id_usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column='id_usuario'
+    )
+    usuario_email = models.CharField(max_length=120, null=True, blank=True)
+
+    detalle = models.JSONField(null=True, blank=True) # Snapshot de cambios o datos
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'auditoria'
+        verbose_name = 'Registro de Auditoría'
+        verbose_name_plural = 'Auditoría del Sistema'
+
+
+class CondominioAnexoRegla(models.Model):
+    """
+    [MAPEO: Tabla 'condominio_anexo_regla']
+    Reglas para el cobro o asignación de anexos (bodegas, estacionamientos).
+    """
+    id_regla = models.AutoField(primary_key=True)
+    id_condominio = models.ForeignKey(
+        Condominio,
+        on_delete=models.CASCADE,
+        db_column='id_condominio'
+    )
+    id_viv_subtipo = models.ForeignKey(
+        CatViviendaSubtipo,
+        on_delete=models.RESTRICT,
+        null=True, blank=True,
+        db_column='id_viv_subtipo'
+    )
+
+    class AnexoTipo(models.TextChoices):
+        BODEGA = 'bodega', 'Bodega'
+        ESTACIONAMIENTO = 'estacionamiento', 'Estacionamiento'
+
+    anexo_tipo = models.CharField(max_length=20, choices=AnexoTipo.choices)
+
+    incluido_qty = models.PositiveSmallIntegerField(default=0, verbose_name="Cant. Incluida")
+    cobrable_por_sobre_qty = models.PositiveSmallIntegerField(default=1, verbose_name="Cobrable si excede")
+
+    vigente_desde = models.DateField()
+    vigente_hasta = models.DateField(null=True, blank=True)
+    comentario = models.CharField(max_length=200, null=True, blank=True)
+
+    def __str__(self):
+        return f"Regla {self.anexo_tipo} - {self.id_condominio.nombre}"
+
+    class Meta:
+        db_table = 'condominio_anexo_regla'
+        verbose_name = 'Regla de Anexo (Bodega/Estac)'
+        verbose_name_plural = 'Reglas de Anexos'
+        indexes = [
+            models.Index(fields=['id_condominio', 'id_viv_subtipo', 'anexo_tipo', 'vigente_desde', 'vigente_hasta'], name='ix_car_rango'),
+        ]
