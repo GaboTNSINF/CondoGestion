@@ -69,16 +69,16 @@
         <h5 class="mb-3">Mis Condominios</h5>
 
         {% if mis_condominios %}
-            <div class="row g-3">
+            <div class="row g-3 justify-content-center">
                 {% for condo in mis_condominios %}
                 <div class="col-12 col-md-6 col-lg-4">
-                    <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="text-primary"><i class="fa-solid fa-building me-2"></i>{{ condo.nombre }}</span>
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                            <span class="text-primary fw-bold"><i class="fa-solid fa-building me-2"></i>{{ condo.nombre }}</span>
                             <span class="badge bg-light text-dark border">{{ condo.rut_base }}-{{ condo.rut_dv }}</span>
                         </div>
                         <div class="card-body">
-                            <p class="card-text text-muted mb-3">
+                            <p class="card-text text-muted mb-3 small">
                                 <i class="fa-solid fa-location-dot me-1"></i>
                                 {{ condo.direccion|default:"Sin dirección" }}
                             </p>
