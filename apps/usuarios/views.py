@@ -6,12 +6,13 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
+import random  # Agregado por seguridad según checklist (aunque usamos get_random_string)
 
 from .models import CodigoVerificacion
 from .forms import UserProfileForm, OTPVerificationForm
 
 @login_required
-def user_profile_view(request):
+def perfil_update_view(request):
     if request.method == 'POST':
         # Check if it's password change
         if 'change_password' in request.POST:

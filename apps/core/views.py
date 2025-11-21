@@ -6,7 +6,11 @@ from django.contrib import messages
 from django.db.models import Sum
 
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
-from .models import Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion, Notificacion
+# Agregamos Auditoria, CondominioAnexoRegla y ParamReglamento como precaución
+from .models import (
+    Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion,
+    Notificacion, Auditoria, CondominioAnexoRegla, ParamReglamento
+)
 from .forms import GastoForm, PagoForm, TrabajadorForm, RemuneracionForm
 from .services import generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto
 
