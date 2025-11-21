@@ -38,6 +38,15 @@ class GastoForm(forms.ModelForm):
             'evidencia_url': 'URL Evidencia (opcional)',
         }
 
+    def clean_periodo(self):
+        periodo = self.cleaned_data.get('periodo')
+        if periodo:
+            if not periodo.isdigit():
+                raise forms.ValidationError("El periodo debe contener solo números.")
+            if len(periodo) != 6:
+                raise forms.ValidationError("El periodo debe tener exactamente 6 dígitos (YYYYMM).")
+        return periodo
+
 class PagoForm(forms.ModelForm):
     class Meta:
         model = Pago
