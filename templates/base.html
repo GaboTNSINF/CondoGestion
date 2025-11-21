@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}CondoGestión{% endblock %}</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <style>
+        /* Mobile-First Radical Overrides */
+        body {
+            background-color: #f8f9fa;
+            font-size: 16px; /* Base font size for readability */
+        }
+
+        /* Touch Target Size Optimization */
+        .btn, .nav-link {
+            padding: 12px 20px; /* Larger touch area */
+            font-size: 1.1rem;
+        }
+
+        /* Card Styling */
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 1rem;
+        }
+
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #f0f0f0;
+            font-weight: 600;
+            padding: 15px;
+            border-radius: 12px 12px 0 0 !important;
+        }
+
+        /* Navigation */
+        .navbar {
+            padding: 1rem;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.4rem;
+            color: #0d6efd;
+        }
+
+        /* Action Buttons (Floating or Bottom) */
+        .action-btn-group {
+            display: grid;
+            grid-gap: 10px;
+        }
+
+        /* Mobile specific */
+        @media (max-width: 576px) {
+            .container-fluid {
+                padding-left: 15px;
+                padding-right: 15px;
+            }
+
+            h1 { font-size: 1.8rem; }
+            h3 { font-size: 1.4rem; }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-light sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fa-solid fa-building-user me-2"></i>CondoGestión
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar" aria-controls="offcanvasNavbar">
+                <span class="navbar-toggler-icon" style="width: 1.5em; height: 1.5em;"></span>
+            </button>
+
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasNavbar" aria-labelledby="offcanvasNavbarLabel">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="offcanvasNavbarLabel">Menú</h5>
+                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <div class="d-flex align-items-center mb-4 p-3 bg-light rounded">
+                        <div class="avatar me-3">
+                            <i class="fa-solid fa-user-circle fa-3x text-secondary"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">{{ user.nombres }} {{ user.apellidos }}</h6>
+                            <small class="text-muted">{{ user.get_tipo_usuario_display }}</small>
+                        </div>
+                    </div>
+
+                    <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+                        <li class="nav-item">
+                            <a class="nav-link active" aria-current="page" href="/">
+                                <i class="fa-solid fa-house me-2"></i> Inicio
+                            </a>
+                        </li>
+                        <!-- Add more global links here if needed -->
+
+                        <hr class="my-3">
+
+                        <li class="nav-item">
+                            <form action="{% url 'logout' %}" method="post" class="d-grid">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger text-start">
+                                    <i class="fa-solid fa-right-from-bracket me-2"></i> Cerrar Sesión
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid py-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

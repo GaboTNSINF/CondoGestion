@@ -1,67 +1,65 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard - CondoGestión</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .btn-logout {
-            background-color: #ff4444; 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            cursor: pointer;
-        }
-    </style>
-</head>
-<body>
-    <h1>Bienvenido a CondoGestión</h1>
-    
-    <p>Hola, <strong>{{ usuario.nombres }} {{ usuario.apellidos }}</strong></p>
-    <p>Tu rol es: {{ usuario.get_tipo_usuario_display }}</p>
+{% extends 'base.html' %}
 
-    <hr>
+{% block title %}Dashboard - CondoGestión{% endblock %}
 
-    <h3>Mis Condominios</h3>
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h4 class="mb-1">Hola, {{ usuario.nombres }}</h4>
+        <p class="text-muted small">Bienvenido a tu panel de control</p>
+    </div>
+</div>
 
-    {% if mis_condominios %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>RUT</th>
-                    <th>Dirección</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
+<div class="row">
+    <div class="col-12">
+        <h5 class="mb-3">Mis Condominios</h5>
+
+        {% if mis_condominios %}
+            <div class="row g-3">
                 {% for condo in mis_condominios %}
-                <tr>
-                    <td><strong>{{ condo.nombre }}</strong></td>
-                    <td>{{ condo.rut_base }}-{{ condo.rut_dv }}</td>
-                    <td>{{ condo.direccion|default:"Sin dirección registrada" }}</td>
-                    <td>
-                        <a href="{% url 'gastos_list' condo.id_condominio %}">Gastos</a> |
-                        <a href="{% url 'cierre_mensual' condo.id_condominio %}">Cierre</a> |
-                        <a href="{% url 'pagos_list' condo.id_condominio %}">Pagos</a> |
-                        <a href="{% url 'trabajadores_list' condo.id_condominio %}">RRHH</a>
-                    </td>
-                </tr>
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="text-primary"><i class="fa-solid fa-building me-2"></i>{{ condo.nombre }}</span>
+                            <span class="badge bg-light text-dark border">{{ condo.rut_base }}-{{ condo.rut_dv }}</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text text-muted mb-3">
+                                <i class="fa-solid fa-location-dot me-1"></i>
+                                {{ condo.direccion|default:"Sin dirección" }}
+                            </p>
+
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'gastos_list' condo.id_condominio %}" class="btn btn-primary">
+                                    <i class="fa-solid fa-file-invoice-dollar me-2"></i> Gastos
+                                </a>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <a href="{% url 'pagos_list' condo.id_condominio %}" class="btn btn-outline-success w-100">
+                                            <i class="fa-solid fa-money-bill-wave d-block mb-1"></i> Pagos
+                                        </a>
+                                    </div>
+                                    <div class="col-6">
+                                        <a href="{% url 'cierre_mensual' condo.id_condominio %}" class="btn btn-outline-secondary w-100">
+                                            <i class="fa-solid fa-calculator d-block mb-1"></i> Cierre
+                                        </a>
+                                    </div>
+                                </div>
+                                <a href="{% url 'trabajadores_list' condo.id_condominio %}" class="btn btn-light text-start border">
+                                    <i class="fa-solid fa-users me-2 text-secondary"></i> RRHH
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No hay condominios registrados en el sistema.</p>
-    {% endif %}
-
-    <hr>
-
-    <form action="{% url 'logout' %}" method="post">
-        {% csrf_token %}
-        <button type="submit" class="btn-logout">Cerrar Sesión</button>
-    </form>
-</body>
-</html>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center p-4">
+                <i class="fa-solid fa-info-circle fa-2x mb-3"></i>
+                <p class="mb-0">No tienes condominios asignados actualmente.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
