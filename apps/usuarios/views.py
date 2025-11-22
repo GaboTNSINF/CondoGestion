@@ -1,15 +1,29 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import LoginView
 from django.contrib import messages
 from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
+from django.urls import reverse_lazy
 import random  # Agregado por seguridad según checklist (aunque usamos get_random_string)
 
 from .models import CodigoVerificacion
 from .forms import UserProfileForm, OTPVerificationForm
+from .decorators import es_admin
+
+class CustomLoginView(LoginView):
+    """
+    Login personalizado que redirige según el rol del usuario.
+    """
+    def get_success_url(self):
+        user = self.request.user
+        if es_admin(user):
+            return reverse_lazy('index') # Dashboard de Gestión
+        else:
+            return reverse_lazy('portal_residente') # Portal de Residente
 
 @login_required
 def perfil_update_view(request):
