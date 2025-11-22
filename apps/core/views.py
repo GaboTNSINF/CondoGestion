@@ -328,6 +328,9 @@ def remuneracion_create_view(request, condominio_id):
 @login_required
 @require_POST
 def proveedor_create_ajax(request):
+    """
+    Crea un proveedor vía AJAX para el modal 'In-Place'.
+    """
     try:
         data = json.loads(request.body)
         nombre = data.get('name')
@@ -335,7 +338,7 @@ def proveedor_create_ajax(request):
         dv = data.get('dv')
 
         if not nombre or not rut or not dv:
-            return JsonResponse({'success': False, 'error': 'Faltan datos obligatorios'}, status=400)
+            return JsonResponse({'success': False, 'error': 'Faltan datos obligatorios (Nombre, RUT, DV)'}, status=400)
 
         proveedor, created = Proveedor.objects.get_or_create(
             rut_base=rut,
@@ -348,18 +351,23 @@ def proveedor_create_ajax(request):
             'id': proveedor.pk,
             'label': str(proveedor)
         })
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
 @require_POST
 def categoria_create_ajax(request):
+    """
+    Crea una categoría vía AJAX.
+    """
     try:
         data = json.loads(request.body)
         nombre = data.get('name')
 
         if not nombre:
-            return JsonResponse({'success': False, 'error': 'Nombre obligatorio'}, status=400)
+            return JsonResponse({'success': False, 'error': 'El nombre de la categoría es obligatorio'}, status=400)
 
         categoria, created = GastoCategoria.objects.get_or_create(
             nombre=nombre
@@ -370,6 +378,8 @@ def categoria_create_ajax(request):
             'id': categoria.pk,
             'label': str(categoria)
         })
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 

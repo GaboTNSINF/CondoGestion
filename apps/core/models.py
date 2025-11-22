@@ -522,8 +522,20 @@ class Gasto(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        # Lógica de Negocio: El total siempre es la suma de neto + iva
-        self.total = self.neto + self.iva
+        # Lógica de Negocio: Cálculo inverso si viene solo el Total
+        # Si total > 0 y neto/iva son 0, calculamos hacia atrás.
+        if self.total > 0 and self.neto == 0 and self.iva == 0:
+            from decimal import Decimal
+            self.neto = self.total / Decimal('1.19')
+            self.iva = self.total - self.neto
+
+        # Garantizar consistencia: El total siempre debe coincidir con la suma (por redondeos)
+        # O re-calcular total?
+        # Si calculamos neto/iva desde total, la suma neto+iva da total.
+        # Si seteamos neto/iva manualmente, recalculamos total.
+        if self.neto > 0 or self.iva > 0:
+            self.total = self.neto + self.iva
+
         super().save(*args, **kwargs)
 
     def __str__(self):
