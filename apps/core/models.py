@@ -539,7 +539,7 @@ class Gasto(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Gasto #{self.id_gasto} - {self.descripcion[:20]}..."
+        return f"Gasto #{self.id_gasto} - {(self.descripcion or '')[:20]}..."
 
     class Meta:
         db_table = 'gasto'
