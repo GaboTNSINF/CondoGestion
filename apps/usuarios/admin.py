@@ -8,6 +8,7 @@ from .models import (
     Usuario, UsuarioAdminCondo, 
     Copropietario, Residencia, CodigoVerificacion
 )
+from .forms import UsuarioCreationForm, UsuarioChangeForm
 # Importamos Notificacion desde core porque el usuario lo pidió explícitamente en este archivo
 from apps.core.models import Notificacion
 
@@ -18,10 +19,12 @@ class UsuarioAdmin(UserAdmin):
     """
     Configuración del admin para nuestro modelo 'Usuario'.
     """
+    add_form = UsuarioCreationForm
+    form = UsuarioChangeForm
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'rut_base', 'rut_dv', 'nombres', 'apellidos', 'tipo_usuario'),
+            'fields': ('email', ('rut_base', 'rut_dv'), 'nombres', 'apellidos', 'tipo_usuario', 'password', 'password_2'),
         }),
     )
     fieldsets = (
