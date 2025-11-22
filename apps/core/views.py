@@ -22,14 +22,27 @@ from .services import (
     generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto,
     get_proximo_periodo
 )
+from apps.usuarios.decorators import solo_admin
 
 # --- INICIO: Vistas del Dashboard ---
 
 @login_required
+def portal_residente_view(request):
+    """
+    Vista exclusiva para Residentes (Portal de solo lectura).
+    Muestra 'Mis Gastos Comunes'.
+    """
+    # Aquí iría la lógica para obtener los cobros asociados a la unidad del usuario.
+    # Por ahora renderizamos un template simple o el mismo index pero filtrado.
+    # Para cumplir estrictamente con la segregación, usamos un template distinto.
+    return render(request, 'core/portal_residente.html', {'usuario': request.user})
+
+@login_required
+@solo_admin
 def index_view(request):
     """
-    Vista principal (Dashboard).
-    Ahora recupera los condominios de la base de datos.
+    Vista principal (Dashboard de Gestión).
+    Solo accesible por Administradores.
     """
     
     # 1. Buscamos TODOS los condominios en la base de datos
@@ -67,6 +80,7 @@ def soporte_view(request):
 # --- INICIO: Vistas de Gastos ---
 
 @login_required
+@solo_admin
 def gastos_list_view(request, condominio_id):
     """
     Vista para listar los gastos de un condominio específico.
@@ -88,6 +102,7 @@ def gastos_list_view(request, condominio_id):
     return render(request, 'core/gastos_list.html', contexto)
 
 @login_required
+@solo_admin
 def gasto_create_view(request, condominio_id):
     """
     Vista para crear un nuevo gasto en un condominio.
@@ -116,6 +131,7 @@ def gasto_create_view(request, condominio_id):
 # --- INICIO: Vistas de Cierre Mensual y Cobros ---
 
 @login_required
+@solo_admin
 def cierre_mensual_view(request, condominio_id):
     """
     Vista para gestionar el cierre mensual.
@@ -166,6 +182,7 @@ def cierre_mensual_view(request, condominio_id):
     return render(request, 'core/cierre_mensual.html', contexto)
 
 @login_required
+@solo_admin
 def cobros_list_view(request, condominio_id, periodo):
     """
     Lista los cobros generados para un condominio y periodo.
@@ -191,6 +208,7 @@ def cobros_list_view(request, condominio_id, periodo):
 # --- INICIO: Vistas de Pagos ---
 
 @login_required
+@solo_admin
 def pago_create_view(request, condominio_id):
     """
     Vista para registrar un nuevo pago manualmente.
@@ -224,6 +242,7 @@ def pago_create_view(request, condominio_id):
     return render(request, 'core/pago_form.html', contexto)
 
 @login_required
+@solo_admin
 def pagos_list_view(request, condominio_id):
     """
     Lista los pagos registrados para un condominio.
@@ -247,6 +266,7 @@ def pagos_list_view(request, condominio_id):
 # --- INICIO: Vistas de RRHH (Trabajadores y Remuneraciones) ---
 
 @login_required
+@solo_admin
 def trabajadores_list_view(request, condominio_id):
     """
     Lista los trabajadores de un condominio.
@@ -261,6 +281,7 @@ def trabajadores_list_view(request, condominio_id):
     return render(request, 'core/trabajadores_list.html', contexto)
 
 @login_required
+@solo_admin
 def trabajador_create_view(request, condominio_id):
     """
     Vista para registrar un nuevo trabajador.
@@ -285,6 +306,7 @@ def trabajador_create_view(request, condominio_id):
     return render(request, 'core/trabajador_form.html', contexto)
 
 @login_required
+@solo_admin
 def remuneraciones_list_view(request, condominio_id):
     """
     Lista las remuneraciones (sueldos) de un condominio.
@@ -300,6 +322,7 @@ def remuneraciones_list_view(request, condominio_id):
     return render(request, 'core/remuneraciones_list.html', contexto)
 
 @login_required
+@solo_admin
 def remuneracion_create_view(request, condominio_id):
     """
     Vista para registrar una nueva remuneración.
