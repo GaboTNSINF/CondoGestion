@@ -63,6 +63,9 @@ class GastoForm(forms.ModelForm):
             self.initial['monto_total'] = self.instance.total
 
     def clean(self):
+        """
+        Validación cruzada de fechas y unicidad de folio.
+        """
         cleaned_data = super().clean()
         proveedor = cleaned_data.get('id_proveedor')
         folio = cleaned_data.get('documento_folio')
