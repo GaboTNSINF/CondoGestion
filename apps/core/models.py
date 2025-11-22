@@ -346,7 +346,7 @@ class CatPlan(models.Model):
         help_text="Número máximo de condominios permitidos en este plan"
     )
     max_unidades = models.PositiveSmallIntegerField(
-        default=100,
+        default=50,
         help_text="Número máximo de unidades (deptos/casas) totales"
     )
     max_grupos = models.PositiveSmallIntegerField(
@@ -378,7 +378,7 @@ class Suscripcion(models.Model):
     id_suscripcion = models.AutoField(primary_key=True)
     id_usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         db_column='id_usuario',
         help_text="El usuario (administrador) dueño de esta suscripción"
     )
@@ -522,12 +522,24 @@ class Gasto(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        # Lógica de Negocio: El total siempre es la suma de neto + iva
-        self.total = self.neto + self.iva
+        # Lógica de Negocio: Cálculo inverso si viene solo el Total
+        # Si total > 0 y neto/iva son 0, calculamos hacia atrás.
+        if self.total > 0 and self.neto == 0 and self.iva == 0:
+            from decimal import Decimal
+            self.neto = self.total / Decimal('1.19')
+            self.iva = self.total - self.neto
+
+        # Garantizar consistencia: El total siempre debe coincidir con la suma (por redondeos)
+        # O re-calcular total?
+        # Si calculamos neto/iva desde total, la suma neto+iva da total.
+        # Si seteamos neto/iva manualmente, recalculamos total.
+        if self.neto > 0 or self.iva > 0:
+            self.total = self.neto + self.iva
+
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Gasto #{self.id_gasto} - {self.descripcion[:20]}..."
+        return f"Gasto #{self.id_gasto} - {(self.descripcion or '')[:20]}..."
 
     class Meta:
         db_table = 'gasto'
