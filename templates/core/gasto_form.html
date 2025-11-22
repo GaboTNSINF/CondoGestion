@@ -29,14 +29,13 @@
                         <div class="mb-3">
                             <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
 
-                            <!-- Add Bootstrap classes to form fields via widget manipulation in template is hard,
-                                 so we wrap or just let default rendering happen but typically we need 'form-control' class.
-                                 Since we can't easily inject classes into Django form fields without backend changes or custom tags,
-                                 we will use a small JS snippet or simply wrap them.
-                                 However, a better way in templates without widget tweaks: -->
-
                             <div class="input-group">
                                 {{ field }}
+                                {% if field.name == 'id_gasto_categ' or field.name == 'id_proveedor' %}
+                                    <button class="btn btn-outline-secondary" type="button" onclick="openCreateModal('{{ field.name }}')">
+                                        <i class="fa-solid fa-plus"></i>
+                                    </button>
+                                {% endif %}
                             </div>
 
                             {% if field.help_text %}
@@ -68,6 +67,41 @@
 </div>
 {% endblock %}
 
+<!-- Modal for Quick Creation -->
+<div class="modal fade" id="quickCreateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickCreateTitle">Crear Nuevo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickCreateForm">
+                    <input type="hidden" id="targetField" value="">
+                    <div class="mb-3">
+                        <label for="newItemName" class="form-label">Nombre</label>
+                        <input type="text" class="form-control form-control-lg" id="newItemName" required>
+                    </div>
+                    <div id="extraFieldsProveedor" class="d-none">
+                        <div class="mb-3">
+                            <label for="newItemRut" class="form-label">RUT (Sin DV)</label>
+                            <input type="number" class="form-control" id="newItemRut">
+                        </div>
+                        <div class="mb-3">
+                            <label for="newItemDv" class="form-label">DV</label>
+                            <input type="text" class="form-control" id="newItemDv" maxlength="1">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuickItem()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block extra_js %}
 <script>
     // Script to add Bootstrap classes to Django form fields automatically
@@ -83,5 +117,80 @@
             check.classList.add('form-check-input');
         });
     });
+
+    var quickCreateModal = new bootstrap.Modal(document.getElementById('quickCreateModal'));
+
+    function openCreateModal(fieldName) {
+        document.getElementById('targetField').value = fieldName;
+        document.getElementById('newItemName').value = '';
+
+        if (fieldName === 'id_proveedor') {
+            document.getElementById('quickCreateTitle').innerText = 'Nuevo Proveedor';
+            document.getElementById('extraFieldsProveedor').classList.remove('d-none');
+        } else {
+            document.getElementById('quickCreateTitle').innerText = 'Nueva Categoría';
+            document.getElementById('extraFieldsProveedor').classList.add('d-none');
+        }
+
+        quickCreateModal.show();
+    }
+
+    function saveQuickItem() {
+        const fieldName = document.getElementById('targetField').value;
+        const name = document.getElementById('newItemName').value;
+
+        if (!name) {
+            alert('El nombre es obligatorio');
+            return;
+        }
+
+        const data = {
+            name: name
+        };
+
+        let url = '';
+        if (fieldName === 'id_proveedor') {
+            url = "{% url 'proveedor_create_ajax' %}";
+            data.rut = document.getElementById('newItemRut').value;
+            data.dv = document.getElementById('newItemDv').value;
+            if (!data.rut || !data.dv) {
+                alert('RUT y DV son obligatorios para proveedor');
+                return;
+            }
+        } else {
+            url = "{% url 'categoria_create_ajax' %}";
+        }
+
+        // AJAX Request (Fetch)
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Error en la petición');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Add to select and select it
+                const select = document.querySelector(`select[name="${fieldName}"]`);
+                const option = new Option(data.label, data.id);
+                select.add(option, undefined);
+                select.value = data.id;
+
+                quickCreateModal.hide();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ocurrió un error al guardar.');
+        });
+    }
 </script>
 {% endblock %}

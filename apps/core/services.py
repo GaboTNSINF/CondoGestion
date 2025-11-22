@@ -526,6 +526,7 @@ def crear_gasto(condominio, form, usuario):
     """
     Crea un gasto a partir de un formulario validado y registra la auditoría.
     Auto-calcula el periodo basado en la fecha de emisión si no viene en el form.
+    Calcula Neto e IVA desde monto_total.
     """
     gasto = form.save(commit=False)
     gasto.id_condominio = condominio
@@ -533,6 +534,20 @@ def crear_gasto(condominio, form, usuario):
     # Auto-calculate period if not present or empty
     if not gasto.periodo and gasto.fecha_emision:
         gasto.periodo = gasto.fecha_emision.strftime("%Y%m")
+
+    # Calculate Neto/IVA from monto_total (from Form cleaned_data)
+    monto_total = form.cleaned_data.get('monto_total')
+    if monto_total:
+        # Neto = Total / 1.19
+        neto = monto_total / Decimal('1.19')
+        iva = monto_total - neto
+
+        # Rounding logic (optional but recommended to match currency)
+        # Standard for Chile CLP is usually integer but DB stores decimal.
+        # We keep decimal precision.
+        gasto.neto = neto
+        gasto.iva = iva
+        # gasto.total is calculated in save() method of model based on neto+iva
 
     gasto.save()
 

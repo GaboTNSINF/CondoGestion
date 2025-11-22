@@ -3,28 +3,33 @@ from django.utils import timezone
 from .models import Gasto, Pago, CatMetodoPago, Trabajador, Remuneracion
 
 class GastoForm(forms.ModelForm):
+    # Campo calculado para UX (reemplaza neto/iva)
+    monto_total = forms.DecimalField(
+        max_digits=12, decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-lg', 'placeholder': 'Monto Total (con IVA)'}),
+        label='Monto Total',
+        help_text='Monto final a pagar (con IVA incluido).'
+    )
+
     class Meta:
         model = Gasto
         fields = [
-            # 'periodo',  <-- Removed from visible fields, auto-calculated
+            # 'periodo',  <-- Removed
             'id_gasto_categ',
             'id_proveedor',
             'id_doc_tipo',
             'documento_folio',
             'fecha_emision',
             'fecha_venc',
-            'neto',
-            'iva',
+            # 'neto', <-- Removed
+            # 'iva',  <-- Removed
             'descripcion',
             'evidencia_url'
         ]
         widgets = {
             'fecha_emision': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
             'fecha_venc': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
-            # 'periodo': forms.TextInput(attrs={'placeholder': 'YYYYMM', 'class': 'form-control form-control-lg'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control form-control-lg'}),
-            'neto': forms.NumberInput(attrs={'class': 'form-control form-control-lg'}),
-            'iva': forms.NumberInput(attrs={'class': 'form-control form-control-lg'}),
             'documento_folio': forms.TextInput(attrs={'class': 'form-control form-control-lg'}),
             'evidencia_url': forms.URLInput(attrs={'class': 'form-control form-control-lg'}),
             'id_gasto_categ': forms.Select(attrs={'class': 'form-control form-control-lg'}),
@@ -38,6 +43,47 @@ class GastoForm(forms.ModelForm):
             'documento_folio': 'Folio Documento',
             'evidencia_url': 'URL Evidencia (opcional)',
         }
+        help_texts = {
+            'documento_folio': 'Número único impreso en la boleta/factura.',
+            'fecha_emision': 'Fecha de emisión del documento.',
+            'fecha_venc': 'Fecha límite de pago.',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set default date to today
+        today = timezone.now().date()
+        if not self.instance.pk and 'fecha_emision' not in self.initial:
+            self.initial['fecha_emision'] = today
+        if not self.instance.pk and 'fecha_venc' not in self.initial:
+            self.initial['fecha_venc'] = today
+
+        # Pre-fill monto_total if editing
+        if self.instance.pk:
+            self.initial['monto_total'] = self.instance.total
+
+    def clean(self):
+        cleaned_data = super().clean()
+        proveedor = cleaned_data.get('id_proveedor')
+        folio = cleaned_data.get('documento_folio')
+        fecha_emision = cleaned_data.get('fecha_emision')
+        fecha_venc = cleaned_data.get('fecha_venc')
+
+        # A. Unicidad del Documento
+        if proveedor and folio:
+            # Check if exists (exclude self if editing)
+            exists = Gasto.objects.filter(id_proveedor=proveedor, documento_folio=folio)
+            if self.instance.pk:
+                exists = exists.exclude(pk=self.instance.pk)
+            if exists.exists():
+                raise forms.ValidationError("Este folio ya fue registrado para este proveedor.")
+
+        # B. Validación de Fechas
+        if fecha_emision and fecha_venc:
+            if fecha_venc < fecha_emision:
+                self.add_error('fecha_venc', "La fecha de vencimiento no puede ser anterior a la emisión.")
+
+        return cleaned_data
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

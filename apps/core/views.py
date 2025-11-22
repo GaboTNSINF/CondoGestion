@@ -7,9 +7,15 @@ from django.db.models import Sum
 
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
 # Agregamos Auditoria, CondominioAnexoRegla y ParamReglamento como precaución
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_protect
+import json
+
 from .models import (
     Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion,
-    Notificacion, Auditoria, CondominioAnexoRegla, ParamReglamento
+    Notificacion, Auditoria, CondominioAnexoRegla, ParamReglamento,
+    Proveedor, GastoCategoria
 )
 from .forms import GastoForm, PagoForm, TrabajadorForm, RemuneracionForm
 from .services import (
@@ -316,3 +322,55 @@ def remuneracion_create_view(request, condominio_id):
     return render(request, 'core/remuneracion_form.html', contexto)
 
 # --- FIN: Vistas de RRHH ---
+
+# --- INICIO: Vistas AJAX ---
+
+@login_required
+@require_POST
+def proveedor_create_ajax(request):
+    try:
+        data = json.loads(request.body)
+        nombre = data.get('name')
+        rut = data.get('rut')
+        dv = data.get('dv')
+
+        if not nombre or not rut or not dv:
+            return JsonResponse({'success': False, 'error': 'Faltan datos obligatorios'}, status=400)
+
+        proveedor, created = Proveedor.objects.get_or_create(
+            rut_base=rut,
+            rut_dv=dv,
+            defaults={'nombre': nombre, 'tipo': Proveedor.TipoProveedor.EMPRESA}
+        )
+
+        return JsonResponse({
+            'success': True,
+            'id': proveedor.pk,
+            'label': str(proveedor)
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@login_required
+@require_POST
+def categoria_create_ajax(request):
+    try:
+        data = json.loads(request.body)
+        nombre = data.get('name')
+
+        if not nombre:
+            return JsonResponse({'success': False, 'error': 'Nombre obligatorio'}, status=400)
+
+        categoria, created = GastoCategoria.objects.get_or_create(
+            nombre=nombre
+        )
+
+        return JsonResponse({
+            'success': True,
+            'id': categoria.pk,
+            'label': str(categoria)
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+# --- FIN: Vistas AJAX ---
