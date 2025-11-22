@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}Portal Residente{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Bienvenido, {{ usuario.nombres }}</h1>
+        <p>Este es tu portal de residente.</p>
+
+        <div class="alert alert-info">
+            <i class="fa-solid fa-info-circle"></i> Aquí podrás ver tus gastos comunes y pagos próximamente.
+        </div>
+
+        <!-- Placeholder para "Mis Gastos Comunes" -->
+        <div class="card mt-4">
+            <div class="card-header">
+                Mis Gastos Comunes
+            </div>
+            <div class="card-body">
+                <p class="text-muted text-center">No hay cobros pendientes.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
