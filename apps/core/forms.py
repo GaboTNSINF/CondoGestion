@@ -85,6 +85,17 @@ class GastoForm(forms.ModelForm):
 
         return cleaned_data
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set default date to today
+        today = timezone.now().date()
+        if not self.instance.pk and 'fecha_emision' not in self.initial:
+            self.initial['fecha_emision'] = today
+        if not self.instance.pk and 'fecha_venc' not in self.initial:
+            self.initial['fecha_venc'] = today
+
+    # Removed clean_periodo as field is removed from form
+
 class PagoForm(forms.ModelForm):
     class Meta:
         model = Pago
