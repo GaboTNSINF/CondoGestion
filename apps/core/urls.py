@@ -16,4 +16,8 @@ urlpatterns = [
     path('condominio/<int:condominio_id>/trabajadores/nuevo/', views.trabajador_create_view, name='trabajador_create'),
     path('condominio/<int:condominio_id>/remuneraciones/', views.remuneraciones_list_view, name='remuneraciones_list'),
     path('condominio/<int:condominio_id>/remuneraciones/nuevo/', views.remuneracion_create_view, name='remuneracion_create'),
+
+    # AJAX Create Endpoints
+    path('api/proveedor/create/', views.proveedor_create_ajax, name='proveedor_create_ajax'),
+    path('api/categoria/create/', views.categoria_create_ajax, name='categoria_create_ajax'),
 ]

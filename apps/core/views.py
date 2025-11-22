@@ -7,12 +7,21 @@ from django.db.models import Sum
 
 # --- IMPORTANTE: Importamos los modelos para poder buscar datos ---
 # Agregamos Auditoria, CondominioAnexoRegla y ParamReglamento como precaución
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_protect
+import json
+
 from .models import (
     Condominio, Gasto, Cobro, Pago, Trabajador, Remuneracion,
-    Notificacion, Auditoria, CondominioAnexoRegla, ParamReglamento
+    Notificacion, Auditoria, CondominioAnexoRegla, ParamReglamento,
+    Proveedor, GastoCategoria
 )
 from .forms import GastoForm, PagoForm, TrabajadorForm, RemuneracionForm
-from .services import generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto
+from .services import (
+    generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto,
+    get_proximo_periodo
+)
 
 # --- INICIO: Vistas del Dashboard ---
 
@@ -115,10 +124,11 @@ def cierre_mensual_view(request, condominio_id):
     condominio = get_object_or_404(Condominio, pk=condominio_id)
 
     # Periodo por defecto: mes actual o último con movimientos
-    # Por simplicidad para el MVP, usaremos un parámetro GET o un hardcode temporal,
-    # o idealmente un selector de fechas.
-    # Vamos a tomar el parametro 'periodo' del GET, o '202311' como ejemplo.
-    periodo = request.GET.get('periodo', '202311') # TODO: Calcular dinámicamente
+    # Calculado dinámicamente
+    periodo_sugerido = get_proximo_periodo(condominio)
+
+    # Permitimos override por GET (opcional, por si acaso)
+    periodo = request.GET.get('periodo', periodo_sugerido)
 
     # Resumen de gastos
     total_gastos = Gasto.objects.filter(
@@ -312,3 +322,55 @@ def remuneracion_create_view(request, condominio_id):
     return render(request, 'core/remuneracion_form.html', contexto)
 
 # --- FIN: Vistas de RRHH ---
+
+# --- INICIO: Vistas AJAX ---
+
+@login_required
+@require_POST
+def proveedor_create_ajax(request):
+    try:
+        data = json.loads(request.body)
+        nombre = data.get('name')
+        rut = data.get('rut')
+        dv = data.get('dv')
+
+        if not nombre or not rut or not dv:
+            return JsonResponse({'success': False, 'error': 'Faltan datos obligatorios'}, status=400)
+
+        proveedor, created = Proveedor.objects.get_or_create(
+            rut_base=rut,
+            rut_dv=dv,
+            defaults={'nombre': nombre, 'tipo': Proveedor.TipoProveedor.EMPRESA}
+        )
+
+        return JsonResponse({
+            'success': True,
+            'id': proveedor.pk,
+            'label': str(proveedor)
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@login_required
+@require_POST
+def categoria_create_ajax(request):
+    try:
+        data = json.loads(request.body)
+        nombre = data.get('name')
+
+        if not nombre:
+            return JsonResponse({'success': False, 'error': 'Nombre obligatorio'}, status=400)
+
+        categoria, created = GastoCategoria.objects.get_or_create(
+            nombre=nombre
+        )
+
+        return JsonResponse({
+            'success': True,
+            'id': categoria.pk,
+            'label': str(categoria)
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+# --- FIN: Vistas AJAX ---

@@ -509,6 +509,18 @@ class Gasto(models.Model):
     descripcion = models.CharField(max_length=300, null=True, blank=True)
     evidencia_url = models.URLField(max_length=500, null=True, blank=True)
 
+    class EstadoValidacion(models.TextChoices):
+        PENDIENTE = 'pendiente', 'Pendiente'
+        APROBADO = 'aprobado', 'Aprobado'
+        RECHAZADO = 'rechazado', 'Rechazado'
+
+    estado_validacion = models.CharField(
+        max_length=20,
+        choices=EstadoValidacion.choices,
+        default=EstadoValidacion.PENDIENTE,
+        db_comment="Estado de validación del gasto (doble ciego)"
+    )
+
     def save(self, *args, **kwargs):
         # Lógica de Negocio: El total siempre es la suma de neto + iva
         self.total = self.neto + self.iva
