@@ -378,7 +378,7 @@ class Suscripcion(models.Model):
     id_suscripcion = models.AutoField(primary_key=True)
     id_usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         db_column='id_usuario',
         help_text="El usuario (administrador) dueño de esta suscripción"
     )
