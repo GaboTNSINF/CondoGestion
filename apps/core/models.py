@@ -346,7 +346,7 @@ class CatPlan(models.Model):
         help_text="Número máximo de condominios permitidos en este plan"
     )
     max_unidades = models.PositiveSmallIntegerField(
-        default=100,
+        default=50,
         help_text="Número máximo de unidades (deptos/casas) totales"
     )
     max_grupos = models.PositiveSmallIntegerField(
