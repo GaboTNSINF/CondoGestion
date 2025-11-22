@@ -18,8 +18,11 @@ class UsuarioAdmin(UserAdmin):
     """
     Configuración del admin para nuestro modelo 'Usuario'.
     """
-    add_fieldsets = UserAdmin.add_fieldsets + (
-        (None, {'fields': ('rut_base', 'rut_dv', 'nombres', 'apellidos', 'tipo_usuario')}),
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'rut_base', 'rut_dv', 'nombres', 'apellidos', 'tipo_usuario'),
+        }),
     )
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
