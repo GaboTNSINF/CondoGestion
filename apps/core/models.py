@@ -175,6 +175,19 @@ class Condominio(models.Model):
     
     num_cuenta = models.CharField(max_length=40, null=True, blank=True)
 
+    # Personalización (Whitelabeling)
+    logo_url = models.URLField(max_length=500, null=True, blank=True)
+    color_primario = models.CharField(
+        max_length=7,
+        default='#0d6efd',
+        help_text="Color hexadecimal principal"
+    )
+    color_secundario = models.CharField(
+        max_length=7,
+        default='#6c757d',
+        help_text="Color hexadecimal secundario"
+    )
+
     def __str__(self):
         return self.nombre
 
