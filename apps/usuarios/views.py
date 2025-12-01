@@ -17,6 +17,7 @@ from .decorators import es_admin
 class CustomLoginView(LoginView):
     """
     Login personalizado que redirige según el rol del usuario.
+    Incluye lógica para 'Recordar sesión'.
     """
     def get_success_url(self):
         user = self.request.user
@@ -24,6 +25,22 @@ class CustomLoginView(LoginView):
             return reverse_lazy('index') # Dashboard de Gestión
         else:
             return reverse_lazy('portal_residente') # Portal de Residente
+
+    def form_valid(self, form):
+        # Llama a la implementación base de form_valid para loguear al usuario
+        response = super().form_valid(form)
+
+        # Verificar si el checkbox 'remember_me' fue marcado
+        remember_me = self.request.POST.get('remember_me')
+
+        if remember_me:
+            # Si está marcado, la sesión expira en 2 semanas (1209600 segundos)
+            self.request.session.set_expiry(1209600)
+        else:
+            # Si NO está marcado, la sesión expira al cerrar el navegador
+            self.request.session.set_expiry(0)
+
+        return response
 
 @login_required
 def perfil_update_view(request):
