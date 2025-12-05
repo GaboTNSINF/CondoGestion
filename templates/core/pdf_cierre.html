@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cierre Mensual - {{ condominio.nombre }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #0d6efd;
+            padding-bottom: 10px;
+        }
+        .header h1 {
+            margin: 0;
+            color: #0d6efd;
+        }
+        .header p {
+            margin: 5px 0;
+            color: #6c757d;
+        }
+        .summary-table, .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+        }
+        .summary-table th, .summary-table td,
+        .details-table th, .details-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px;
+            text-align: left;
+        }
+        .summary-table th, .details-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .total-row td {
+            font-weight: bold;
+            background-color: #f8f9fa;
+        }
+        h2 {
+            color: #0d6efd;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <!-- Opcional: Si tienes un logo, puedes añadirlo aquí -->
+        <!-- <img src="{{ condominio.logo_url }}" alt="Logo" style="max-height: 80px; margin-bottom: 10px;"> -->
+        <h1>{{ condominio.nombre }}</h1>
+        <p>Resumen del Cierre Mensual</p>
+    </div>
+
+    <h2>Información General</h2>
+    <table class="summary-table">
+        <tr>
+            <th>Período del Cierre</th>
+            <td>{{ periodo }}</td>
+        </tr>
+        <tr>
+            <th>Fecha de Emisión del Reporte</th>
+            <td>{% now "d/m/Y H:i" %}</td>
+        </tr>
+        <tr>
+            <th>Total de Gastos del Período</th>
+            <td class="text-right">${{ total_gastos|floatformat:0 }}</td>
+        </tr>
+        <tr>
+            <th>Total Cobrado a Unidades</th>
+            <td class="text-right">${{ total_cobrado|floatformat:0 }}</td>
+        </tr>
+    </table>
+
+    <h2>Detalle de Cobros por Unidad</h2>
+    <table class="details-table">
+        <thead>
+            <tr>
+                <th>Unidad</th>
+                <th class="text-right">Cargos del Mes</th>
+                <th class="text-right">Intereses</th>
+                <th class="text-right">Total a Pagar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cobro in cobros %}
+            <tr>
+                <td>{{ cobro.id_unidad.codigo }}</td>
+                <td class="text-right">${{ cobro.total_cargos|floatformat:0 }}</td>
+                <td class="text-right">${{ cobro.total_interes|floatformat:0 }}</td>
+                <td class="text-right">${{ cobro.saldo|floatformat:0 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align: center;">No se encontraron cobros para este período.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="3">Total General</td>
+                <td class="text-right">${{ total_cobrado|floatformat:0 }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+</body>
+</html>
