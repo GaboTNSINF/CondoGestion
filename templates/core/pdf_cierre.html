@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+{% load core_extras %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cierre Mensual - {{ condominio.nombre }}</title>
+    <style>
+        body { font-family: sans-serif; font-size: 12px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { margin: 0; }
+        .header h2 { margin: 5px 0; color: #555; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .text-right { text-align: right; }
+        .total-row { font-weight: bold; background-color: #eee; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ condominio.nombre }}</h1>
+        <h2>Resumen de Gastos Comunes - Periodo {{ periodo|format_period }}</h2>
+        <p>Fecha de emisión: {% now "d/m/Y" %}</p>
+    </div>
+
+    <h3>Resumen Financiero</h3>
+    <table>
+        <tr>
+            <th>Concepto</th>
+            <th class="text-right">Monto</th>
+        </tr>
+        <tr>
+            <td>Total Gastos Operacionales</td>
+            <td class="text-right">$ {{ total_gastos|floatformat:0 }}</td>
+        </tr>
+        <tr>
+            <td>Total Cobrado (Prorrateado)</td>
+            <td class="text-right">$ {{ total_cobrado|floatformat:0 }}</td>
+        </tr>
+    </table>
+
+    <h3>Detalle por Unidad</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Unidad</th>
+                <th>Estado</th>
+                <th class="text-right">Total Cargos</th>
+                <th class="text-right">Saldo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cobro in cobros %}
+            <tr>
+                <td>{{ cobro.id_unidad.codigo }}</td>
+                <td>{{ cobro.id_cobro_estado.codigo }}</td>
+                <td class="text-right">$ {{ cobro.total_cargos|floatformat:0 }}</td>
+                <td class="text-right">$ {{ cobro.saldo|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="2">TOTAL</td>
+                <td class="text-right">$ {{ total_cobrado|floatformat:0 }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+</html>

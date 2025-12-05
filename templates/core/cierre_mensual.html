@@ -52,6 +52,10 @@
                             <i class="fa-solid fa-list-ul me-2"></i> Ver Boletas Generadas
                         </a>
 
+                        <a href="?periodo={{ periodo }}&export_pdf=true" class="btn btn-outline-danger" target="_blank">
+                            <i class="fa-solid fa-file-pdf me-2"></i> Descargar PDF Respaldo
+                        </a>
+
                         <form method="post" class="d-grid">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-outline-secondary" onclick="return confirm('¿Seguro que deseas re-generar el cierre? Esto actualizará los montos.')">

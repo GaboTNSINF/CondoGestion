@@ -22,6 +22,7 @@ from .services import (
     generar_cierre_mensual, registrar_pago, registrar_auditoria, crear_gasto,
     get_proximo_periodo
 )
+from .utils import render_to_pdf
 from apps.usuarios.decorators import solo_admin
 
 # --- INICIO: Vistas del Dashboard ---
@@ -161,11 +162,28 @@ def cierre_mensual_view(request, condominio_id):
     ya_cerrado = cobros_existentes.exists()
     total_cobrado = cobros_existentes.aggregate(Sum('total_cargos'))['total_cargos__sum'] or 0
 
+    if request.GET.get('export_pdf') == 'true':
+        if not ya_cerrado:
+            messages.error(request, "No se puede generar PDF de un mes no cerrado.")
+            return redirect('cierre_mensual', condominio_id=condominio.id_condominio)
+
+        context_pdf = {
+            'condominio': condominio,
+            'periodo': periodo,
+            'total_gastos': total_gastos,
+            'total_cobrado': total_cobrado,
+            'cobros': cobros_existentes.select_related('id_unidad', 'id_cobro_estado').order_by('id_unidad__codigo')
+        }
+        return render_to_pdf('core/pdf_cierre.html', context_pdf)
+
     if request.method == 'POST':
         # Generar el cierre
         try:
-            generar_cierre_mensual(condominio, periodo)
-            messages.success(request, f"Cierre mensual {periodo} generado exitosamente.")
+            cobros_gen = generar_cierre_mensual(condominio, periodo)
+            if not cobros_gen:
+                messages.warning(request, f"El proceso finalizó pero no se generaron cobros. Verifique si existen unidades asociadas.")
+            else:
+                messages.success(request, f"Cierre mensual {periodo} generado exitosamente ({len(cobros_gen)} boletas).")
             return redirect('cobros_list', condominio_id=condominio.id_condominio, periodo=periodo)
         except Exception as e:
             messages.error(request, f"Error al generar cierre: {str(e)}")
