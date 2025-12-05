@@ -369,6 +369,16 @@ def generar_cierre_mensual(condominio, periodo):
     # Calcular Cobros por Anexos Extra (Bodegas/Estacionamientos)
     calcular_cobro_anexos(condominio, periodo)
 
+    # --- VALIDACIÓN CRÍTICA ---
+    # Si después de todo el proceso no se generó ningún cobro, es un error.
+    # La causa más común es que no hay Unidades registradas en el Condominio.
+    if not cobros_generados:
+        raise ValueError(
+            "No se generó ningún cobro. "
+            "Verifique que existan Unidades (departamentos) registradas en este condominio "
+            "antes de generar un cierre."
+        )
+
     # Auditoría masiva (simplificada)
     registrar_auditoria(
         entidad='Cobro',
