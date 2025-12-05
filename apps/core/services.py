@@ -287,7 +287,13 @@ def generar_cierre_mensual(condominio, periodo):
     if not regla_prorrateo:
         regla_prorrateo = crear_regla_gasto_comun_default(condominio)
 
-    if not ProrrateoFactorUnidad.objects.filter(id_prorrateo=regla_prorrateo).exists():
+    # Validar que existan unidades y recalcular factores si es necesario (ej: nuevas unidades)
+    total_unidades = Unidad.objects.filter(id_grupo__id_condominio=condominio).count()
+    if total_unidades == 0:
+        return []
+
+    count_factores = ProrrateoFactorUnidad.objects.filter(id_prorrateo=regla_prorrateo).count()
+    if count_factores != total_unidades:
         calcular_factores_prorrateo(regla_prorrateo)
 
     factores = ProrrateoFactorUnidad.objects.filter(id_prorrateo=regla_prorrateo)
